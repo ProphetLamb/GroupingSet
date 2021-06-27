@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <LangVersion>9</LangVersion>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Title>PairSet</Title>
+    <Authors>ProphetLamb</Authors>
+    <Owners>ProphetLamb</Owners>
+    <Description>Mutable Lookup &amp; ReadOnlyDictionary</Description>
+    <Copyright>Copyright (c) 2021 Prophet Lamb</Copyright>
+    <PackageProjectUrl>https://github.com/ProphetLamb/PairSet</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/ProphetLamb/PairSet.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageTags>C#</PackageTags>
+    <Version>0.0.1</Version>
+  </PropertyGroup>
+
+</Project>
