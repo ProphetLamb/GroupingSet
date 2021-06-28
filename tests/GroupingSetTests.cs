@@ -1,8 +1,6 @@
-﻿using System.Linq;
+﻿using NUnit.Framework;
 
-using NUnit.Framework;
-
-namespace KeyValueSet.Tests
+namespace KeyValueCollection.Tests
 {
     [TestFixture]
     public class GroupSetTests

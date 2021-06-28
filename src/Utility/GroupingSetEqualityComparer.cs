@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 
-namespace KeyValueSet
+namespace KeyValueCollection.Utility
 {
     /// <summary>Equality comparer for hashsets of hashsets</summary>
     internal sealed class GroupingSetEqualityComparer<TKey, TElement> : IEqualityComparer<GroupingSet<TKey, TElement>?>

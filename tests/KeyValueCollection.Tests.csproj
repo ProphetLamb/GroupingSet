@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\KeyValueSet.csproj" />
+    <ProjectReference Include="..\src\KeyValueCollection.csproj" />
   </ItemGroup>
 
 </Project>

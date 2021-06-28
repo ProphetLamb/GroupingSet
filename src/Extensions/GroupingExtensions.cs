@@ -1,19 +1,30 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 
-namespace KeyValueSet
+using KeyValueCollection.Grouping;
+
+namespace KeyValueCollection.Extensions
 {
     public static class GroupingExtensions
     {
-        public static GroupingSet<TKey, TElement> ToSet<TKey, TElement> (this IEnumerable<IGrouping<TKey, TElement>> sequence)
+        internal static ImmutableGrouping<TKey, TElement> ToImmutable<TKey, TElement>(this ValueGrouping<TKey, TElement> grouping)
             where TKey : notnull
         {
-            return new(sequence);
+            if (grouping._elements != null)
+                return new(grouping._elements, grouping._key, grouping.HashCode);
+            return new(Enumerable.Empty<TElement>(), grouping._key, grouping.HashCode);
         }
-        public static GroupingSet<TKey, TElement> ToSet<TKey, TElement> (this IEnumerable<IGrouping<TKey, TElement>> sequence, IEqualityComparer<TKey> comparer)
+
+        internal static ImmutableGrouping<TKey, TElement> ToImmutable<TKey, TElement>(this IGrouping<TKey, TElement> grouping)
             where TKey : notnull
         {
-            return new(sequence, comparer);
+            return new(grouping, grouping.Key, grouping.Key.GetHashCode());
+        }
+
+        internal static ImmutableGrouping<TKey, TElement> ToImmutable<TKey, TElement>(this IGrouping<TKey, TElement> grouping, IEqualityComparer<TKey> hashCodeCreator)
+            where TKey : notnull
+        {
+            return new(grouping, grouping.Key, hashCodeCreator.GetHashCode(grouping.Key));
         }
     }
 }

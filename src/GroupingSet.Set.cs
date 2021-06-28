@@ -4,9 +4,10 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-using KeyValueSet.Utility;
+using KeyValueCollection.Grouping;
+using KeyValueCollection.Utility;
 
-namespace KeyValueSet
+namespace KeyValueCollection
 {
     public partial class GroupingSet<TKey, TElement>
     {
@@ -28,8 +29,9 @@ namespace KeyValueSet
         {
             foreach (IGrouping<TKey, TElement> element in other)
             {
-                if (!ContainsKey(element.Key))
-                    return false;
+                if (ContainsKey(element.Key))
+                    continue;
+                return false;
             }
 
             return true;
@@ -88,11 +90,12 @@ namespace KeyValueSet
                 int location = FindItemIndex(grouping.Key, out _);
                 if (location >= 0)
                 {
-                    if (bitHelper.IsMarked(location))
-                        continue;
-                    // Item hasn't been seen yet.
-                    bitHelper.MarkBit(location);
-                    uniqueFoundCount++;
+                    if (!bitHelper.IsMarked(location))
+                    {
+                        // Item hasn't been seen yet.
+                        bitHelper.MarkBit(location);
+                        uniqueFoundCount++;
+                    }
                 }
                 else
                 {
@@ -156,7 +159,7 @@ namespace KeyValueSet
             {
                 if (CreateIfNotPresent(grouping.Key, out int location))
                 {
-                    AddToExisting(location, grouping);
+                    _entries![location].AddRange(grouping);
                     // wasn't already present in collection; flag it as something not to remove
                     // *NOTE* if location is out of range, we should ignore. BitHelper will
                     // detect that it's out of bounds and not try to mark it. But it's
@@ -175,14 +178,14 @@ namespace KeyValueSet
                 }
             }
 
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             // if anything marked, remove it
             for (int i = 0; i < originalCount; i++)
             {
                 if (itemsToRemove.IsMarked(i))
                 {
-                    ref Entry entry = ref entries[i];
-                    Remove(entry.Grouping.Key);
+                    ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                    Remove(entry.Key);
                 }
             }
         }
@@ -194,15 +197,15 @@ namespace KeyValueSet
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         protected override void IntersectWithHashSetWithSameComparer(GroupingSet<TKey, TElement> other)
         {
-            Entry[]? entries = _entries;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             for (int i = 0; i < m_count; i++)
             {
-                ref Entry entry = ref entries![i];
-                if (entry.Next < -1)
-                    continue;
-                
-                if (!other.ContainsKey(entry.Grouping.Key))
-                    Remove(entry.Grouping.Key);
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                if (entry.Next >= -1)
+                {
+                    if (!other.ContainsKey(entry.Key))
+                        Remove(entry.Key);
+                }
             }
         }
 
@@ -232,14 +235,14 @@ namespace KeyValueSet
                     bitHelper.MarkBit(location);
             }
 
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             // If anything unmarked, remove it. Perf can be optimized here if BitHelper had a
             // FindFirstUnmarked method.
             for (int i = 0; i < originalCount; i++)
             {
-                ref Entry entry = ref entries[i];
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
                 if (entry.Next >= -1 && !bitHelper.IsMarked(i))
-                    Remove(entry.Grouping.Key);
+                    Remove(entry.Key);
             }
         }
 
@@ -258,8 +261,9 @@ namespace KeyValueSet
         {
             foreach (IGrouping<TKey, TElement> item in this)
             {
-                if (!other.ContainsKey(item.Key))
-                    return false;
+                if (other.ContainsKey(item.Key))
+                    continue;
+                return false;
             }
 
             return true;

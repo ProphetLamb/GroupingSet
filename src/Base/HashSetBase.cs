@@ -1,16 +1,16 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 
-namespace KeyValueSet.Base
+namespace KeyValueCollection.Base
 {
-    public abstract class SetBase<TItem, TSelf> : 
+    public abstract class HashSetBase<TItem, TSelf> : 
         ISet<TItem>,
 #if NET5_0
         IReadOnlySet<TItem>
 #else
         IReadOnlyCollection<TItem>
 #endif
-        where TSelf : SetBase<TItem, TSelf>
+        where TSelf : HashSetBase<TItem, TSelf>
     {
         protected int m_count;
         
@@ -18,7 +18,7 @@ namespace KeyValueSet.Base
 
         /// <inheritdoc />
         bool ICollection<TItem>.IsReadOnly => false;
-
+        
         /// <inheritdoc />
         public void UnionWith(IEnumerable<TItem> other)
         {
@@ -304,13 +304,20 @@ namespace KeyValueSet.Base
 
         /// <inheritdoc cref="ICollection{T}.CopyTo"/>
         public void CopyTo(TItem[] array, int arrayIndex) => CopyTo(array, arrayIndex, Count);
-
         
         /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator()
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+        public List<TItem> ToList()
         {
-            return GetEnumerator();
+            var list = InternalToList();
+            list.TrimExcess();
+            return list;
         }
+
+        public TItem[] ToArray() => InternalToList().ToArray();
+
+        protected abstract List<TItem> InternalToList();
         
         /// <inheritdoc />
         public abstract bool Add(TItem items);

@@ -2,7 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 
-namespace KeyValueSet.Utility
+namespace KeyValueCollection.Utility
 {
     internal static partial class HashHelpers
     {

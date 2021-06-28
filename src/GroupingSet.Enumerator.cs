@@ -1,13 +1,16 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace KeyValueSet
+using KeyValueCollection.Base;
+using KeyValueCollection.Exceptions;
+using KeyValueCollection.Grouping;
+
+namespace KeyValueCollection
 {
     public partial class GroupingSet<TKey, TElement>
     {
-        public struct Enumerator : IEnumerator<IGrouping<TKey, TElement>>
+        internal struct Enumerator : IEnumerator<IGrouping<TKey, TElement>>
         {
             private readonly GroupingSet<TKey, TElement> _set;
             private readonly int _version;
@@ -25,17 +28,18 @@ namespace KeyValueSet
             public bool MoveNext()
             {
                 if (_version != _set._version)
-                    throw new InvalidOperationException("_version != _set._version");
+                    ThrowHelper.ThrowInvalidOperationException_EnumeratorVersionDiffers();
 
                 // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
                 // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
                 while ((uint)_index < (uint)_set.m_count)
                 {
-                    ref Entry entry = ref _set._entries![_index++];
-                    if (entry.Next < -1)
-                        continue;
-                    _current = entry.Grouping;
-                    return true;
+                    ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
+                    if (entry.Next >= -1)
+                    {
+                        _current = entry;
+                        return true;
+                    }
                 }
 
                 _index = _set.m_count + 1;
@@ -60,55 +64,79 @@ namespace KeyValueSet
             public void Dispose() { }
         }
 
-        public struct DictionaryEnumerator : IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>>
-        {
-            private Enumerator _en;
-
-
-            /// <inheritdoc />
-            public DictionaryEnumerator(Enumerator en)
-                : this()
-            {
-                _en = en;
-            }
-
-            /// <inheritdoc />
-            public bool MoveNext() => _en.MoveNext();
-
-            /// <inheritdoc />
-            public void Reset() => _en.Reset();
-
-            /// <inheritdoc />
-            public KeyValuePair<TKey, IEnumerable<TElement>> Current => new(_en.Current.Key, _en.Current);
-
-            /// <inheritdoc />
-            object IEnumerator.Current => Current;
-
-            /// <inheritdoc />
-            public void Dispose()
-            {
-                _en.Dispose();
-            }
-        }
-
-        public sealed class KeyCollection : ICollection<TKey>
+        internal struct DictionaryEnumerator : IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>>
         {
             private readonly GroupingSet<TKey, TElement> _set;
+            private readonly int _version;
+            private int _index;
+            private KeyValuePair<TKey, IEnumerable<TElement>> _current;
+
+            internal DictionaryEnumerator(GroupingSet<TKey, TElement> set)
+            {
+                _set = set;
+                _version = set._version;
+                _index = 0;
+                _current = default!;
+            }
+
+            public bool MoveNext()
+            {
+                if (_version != _set._version)
+                    ThrowHelper.ThrowInvalidOperationException_EnumeratorVersionDiffers();
+
+                // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+                // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+                while ((uint)_index < (uint)_set.m_count)
+                {
+                    ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
+                    if (entry.Next >= -1)
+                    {
+                        _current = new KeyValuePair<TKey, IEnumerable<TElement>>(entry._key, entry._elements ?? Enumerable.Empty<TElement>());
+                        return true;
+                    }
+                }
+
+                _index = _set.m_count + 1;
+                _current = default!;
+                return false;
+            }
+
+            /// <inheritdoc />
+            public void Reset()
+            {
+                _index = 0;
+                _current = default!;
+            }
+
+            /// <inheritdoc />
+            public KeyValuePair<TKey, IEnumerable<TElement>> Current => _current;
+
+            /// <inheritdoc />
+            object IEnumerator.Current => _current;
+
+            /// <inheritdoc />
+            public void Dispose() { }
+        }
+
+        internal sealed class KeyCollection : Iterator<TKey>, ICollection<TKey>
+        {
+            private readonly GroupingSet<TKey, TElement> _set;
+            private readonly int _version;
+            private readonly int _count;
+            private int _index;
 
             public KeyCollection(GroupingSet<TKey, TElement> set)
             {
                 _set = set;
-            }
-
-
-            /// <inheritdoc />
-            public IEnumerator<TKey> GetEnumerator()
-            {
-                return _set.Select<IGrouping<TKey, TElement>, TKey>(g => g.Key).GetEnumerator();
+                _version = set._version;
+                _count = set.m_count;
             }
 
             /// <inheritdoc />
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            public int Count => _count;
+
+            /// <inheritdoc />
+            public bool IsReadOnly => false;
 
             /// <inheritdoc />
             public void Add(TKey item) => _set.CreateIfNotPresent(item, out _);
@@ -128,21 +156,48 @@ namespace KeyValueSet
 
             /// <inheritdoc />
             public bool Remove(TKey item) => _set.Remove(item);
+            
+            /// <inheritdoc />
+            public override bool MoveNext()
+            {
+                if (_version != _set._version || _set._entries == null)
+                    ThrowHelper.ThrowInvalidOperationException_EnumeratorVersionDiffers();
+                
+                if (_state >= 0 && (uint)_count <= (uint)_index)
+                {
+                    // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+                    // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+                    while ((uint)_index < (uint)_set.m_count)
+                    {
+                        ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
+                        if (entry.Next >= -1)
+                        {
+                            _current = entry._key;
+                            return true;
+                        }
+                    }
+                    return true;
+                }
+
+                return false;
+            }
 
             /// <inheritdoc />
-            public int Count => _set.Count;
-
-            /// <inheritdoc />
-            public bool IsReadOnly => false;
+            public override Iterator<TKey> Clone() => new KeyCollection(_set);
         }
         
-        public sealed class ValueCollection : ICollection<IEnumerable<TElement>>
+        internal sealed class ValueCollection : Iterator<IEnumerable<TElement>>, ICollection<IEnumerable<TElement>>
         {
             private readonly GroupingSet<TKey, TElement> _set;
+            private readonly int _version;
+            private readonly int _count;
+            private int _index;
 
             public ValueCollection(GroupingSet<TKey, TElement> set)
             {
                 _set = set;
+                _version = set._version;
+                _count = set.m_count;
             }
 
             /// <inheritdoc />
@@ -152,22 +207,13 @@ namespace KeyValueSet
             public bool IsReadOnly => true;
 
             /// <inheritdoc />
-            public IEnumerator<IEnumerable<TElement>> GetEnumerator()
-            {
-                return _set.Select<IGrouping<TKey, TElement>, IEnumerable<TElement>>(g => g).GetEnumerator();
-            }
+            void ICollection<IEnumerable<TElement>>.Add(IEnumerable<TElement> item) =>throw ThrowHelper.GetNotSupportedException();
 
             /// <inheritdoc />
-            IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+            void ICollection<IEnumerable<TElement>>.Clear() => throw ThrowHelper.GetNotSupportedException();
 
             /// <inheritdoc />
-            void ICollection<IEnumerable<TElement>>.Add(IEnumerable<TElement> item) => throw new NotSupportedException();
-
-            /// <inheritdoc />
-            void ICollection<IEnumerable<TElement>>.Clear() => throw new NotSupportedException();
-
-            /// <inheritdoc />
-            bool ICollection<IEnumerable<TElement>>.Contains(IEnumerable<TElement> item) => throw new NotSupportedException();
+            bool ICollection<IEnumerable<TElement>>.Contains(IEnumerable<TElement> item) => throw ThrowHelper.GetNotSupportedException();
 
             /// <inheritdoc />
             public void CopyTo(IEnumerable<TElement>[] array, int arrayIndex)
@@ -177,7 +223,35 @@ namespace KeyValueSet
             }
 
             /// <inheritdoc />
-            bool ICollection<IEnumerable<TElement>>.Remove(IEnumerable<TElement> item) => throw new NotSupportedException();
+            bool ICollection<IEnumerable<TElement>>.Remove(IEnumerable<TElement> item) => throw ThrowHelper.GetNotSupportedException();
+
+            /// <inheritdoc />
+            public override bool MoveNext()
+            {
+                if (_version != _set._version || _set._entries == null)
+                    ThrowHelper.ThrowInvalidOperationException_EnumeratorVersionDiffers();
+                
+                if (_state >= 0 && (uint)_count <= (uint)_index)
+                {
+                    // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
+                    // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
+                    while ((uint)_index < (uint)_set.m_count)
+                    {
+                        ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
+                        if (entry.Next >= -1)
+                        {
+                            _current = entry._elements ?? Enumerable.Empty<TElement>();
+                            return true;
+                        }
+                    }
+                    return true;
+                }
+
+                return false;
+            }
+            
+            /// <inheritdoc />
+            public override Iterator<IEnumerable<TElement>> Clone() => new ValueCollection(_set);
         }
     }
 }

@@ -7,18 +7,20 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
-using KeyValueSet.Base;
-using KeyValueSet.DebugViews;
-using KeyValueSet.Exceptions;
-using KeyValueSet.Utility;
+using KeyValueCollection.Base;
+using KeyValueCollection.DebugViews;
+using KeyValueCollection.Exceptions;
+using KeyValueCollection.Extensions;
+using KeyValueCollection.Grouping;
+using KeyValueCollection.Utility;
 
-namespace KeyValueSet
+namespace KeyValueCollection
 {
-    [DebuggerTypeProxy(typeof(GroupingSetDebugView<,>))]
     [DebuggerDisplay("Count: {Count}")]
+    [DebuggerTypeProxy(typeof(GroupingSetDebugView<,>))]
     [Serializable]
     public partial class GroupingSet<TKey, TElement> : 
-        SetBase<IGrouping<TKey, TElement>, GroupingSet<TKey, TElement>>,
+        HashSetBase<IGrouping<TKey, TElement>, GroupingSet<TKey, TElement>>,
         ICollection<IGrouping<TKey, TElement>>,
         IDictionary<TKey, IEnumerable<TElement>>,
         IReadOnlyDictionary<TKey, IEnumerable<TElement>>,
@@ -47,11 +49,11 @@ namespace KeyValueSet
         /// a lot of adds followed by removes. Users must explicitly shrink by calling TrimExcess.
         /// This is set to 3 because capacity is acceptable as 2x rounded up to nearest prime.
         /// </summary>
-        private const int ShrinkThreshold = 3;
+        internal const int ShrinkThreshold = 3;
         private const int StartOfFreeList = -3;
         
         private int[]? _buckets;
-        private Entry[]? _entries;
+        private ValueGrouping<TKey, TElement>[]? _entries;
 #if TARGET_64BIT
         private ulong _fastModMultiplier;
 #endif
@@ -66,10 +68,7 @@ namespace KeyValueSet
 
 #region Ctors
 
-        public GroupingSet()
-        {
-            
-        }
+        public GroupingSet() { }
 
         public GroupingSet(IEqualityComparer<TKey>? comparer)
         {
@@ -83,15 +82,10 @@ namespace KeyValueSet
         public GroupingSet(int capacity, IEqualityComparer<TKey>? comparer)
             : this(comparer)
         {
-            switch (capacity)
-            {
-                case < 0:
-                    ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.capacity);
-                    break;
-                case > 0:
-                    Initialize(capacity);
-                    break;
-            }
+            if (capacity < 0)
+                ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.capacity);
+            if (capacity > 0)
+                Initialize(capacity);
         }
         
         public GroupingSet(IEnumerable<IGrouping<TKey, TElement>> groupings)
@@ -100,20 +94,24 @@ namespace KeyValueSet
         public GroupingSet(IEnumerable<IGrouping<TKey, TElement>> groupings, IEqualityComparer<TKey>? comparer)
             : this(comparer)
         {
+            int count;
             switch (groupings)
             {
                 case GroupingSet<TKey, TElement> other:
                     ConstructFrom(other);
                     break;
-                case ICollection<IGrouping<TKey, TElement>> collection: {
-                    int count = collection.Count;
+                case ICollection<IGrouping<TKey, TElement>> collection:
+                    count = collection.Count;
                     if (count > 0)
                         Initialize(count);
                     goto default;
-                }
+                case IReadOnlyCollection<IGrouping<TKey, TElement>> sequence:
+                    count = sequence.Count;
+                    if (count > 0)
+                        Initialize(count);
+                    goto default;
                 default:
                     UnionWith(groupings);
-                    
                     if (ShouldTrimExcess)
                         TrimExcess();
                     break;
@@ -144,15 +142,14 @@ namespace KeyValueSet
         /// <inheritdoc cref="IDictionary{TKey,TValue}.Values" />
         public ICollection<IGrouping<TKey, TElement>> Values => this;
 
-        public ref Grouping<TKey, TElement> this[TKey key]
+        public ref ValueGrouping<TKey, TElement> this[TKey key]
         {
             get
             {
                 int location = FindItemIndex(key, out _);
                 if (location < 0)
-                    throw new KeyNotFoundException();
-                ref Entry entry = ref _entries![location];
-                return ref entry.Grouping;
+                    ThrowHelper.ThrowKeyNotFoundException();
+                return ref _entries![location];
             }
         }
 
@@ -166,52 +163,48 @@ namespace KeyValueSet
             if (capacity < 0)
                 ThrowHelper.ThrowArgumentOutOfRangeException(ExceptionArgument.capacity);
 
-            int currentCapacity = _entries?.Length ?? 0;
+            int currentCapacity = _entries != null ? _entries.Length : 0;
             if (currentCapacity >= capacity)
                 return currentCapacity;
 
-            if (_buckets == null)
-                return Initialize(capacity);
+            if (_buckets != null)
+            {
+                int newSize = HashHelpers.GetPrime(capacity);
+                Resize(newSize, false);
+                return newSize;
+            }
 
-            int newSize = HashHelpers.GetPrime(capacity);
-            Resize(newSize, false);
-            return newSize;
+            return Initialize(capacity);
         }
         
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetValue(in TKey key, [NotNullWhen(true)] out Grouping<TKey, TElement>? value)
+        public bool TryGetValue(in TKey key, [NotNullWhen(true)] out ValueGrouping<TKey, TElement>? value)
         {
             int location = FindItemIndex(key, out _);
-            if (location < 0)
+            if (location >= 0)
             {
-                value = null;
-                return false;
+                value = _entries![location];
+                return true;
             }
-        
-            ref Entry entry = ref _entries![location];
-            value = entry.Grouping;
-            return true;
+
+            value = null;
+            return false;
         }
         
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Add(in TKey key, IEnumerable<TElement> elements)
         {
             CreateIfNotPresent(key, out int location);
-            AddToExisting(location, elements);
+            _entries![location].AddRange(elements);
             return location;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(in TKey key, TElement element)
         {
             CreateIfNotPresent(key, out int location);
-            ref Entry entry = ref _entries![location];
-            entry.Grouping.Add(element);
+            _entries![location].Add(element);
         }
 
         /// <inheritdoc />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public sealed override bool Remove(IGrouping<TKey, TElement> items) => Remove(items.Key);
 
         /// <inheritdoc />
@@ -224,11 +217,7 @@ namespace KeyValueSet
             if (location < 0)
                 return false;
 
-            Entry[] entries = _entries!;
-            ref Entry entry = ref entries[location];
-            entry.Grouping.Dispose();
-            entries[location] = default;
-
+            ClearEntry(ref _entries![location]);
             _freeList = location;
             _freeCount++;
             
@@ -236,7 +225,7 @@ namespace KeyValueSet
         }
 
         /// <summary>
-        /// Sets the capacity of a <see cref="GroupingSet{TKey,TElement}"/> object to the actual number of elements it contains,
+        /// Sets the capacity of a <see cref="KeyValueCollection.GroupingSet{TKey,TElement}"/> object to the actual number of elements it contains,
         /// rounded up to a nearby, implementation-specific value.
         /// </summary>
         public void TrimExcess()
@@ -244,24 +233,22 @@ namespace KeyValueSet
             int capacity = Count;
 
             int newSize = HashHelpers.GetPrime(capacity);
-            Entry[]? oldEntries = _entries;
+            ValueGrouping<TKey, TElement>[]? oldEntries = _entries;
             int currentCapacity = oldEntries?.Length ?? 0;
             if (newSize >= currentCapacity)
-            {
                 return;
-            }
 
             int oldCount = m_count;
             _version++;
             Initialize(newSize);
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             int count = 0;
             for (int i = 0; i < oldCount; i++)
             {
                 int hashCode = oldEntries![i].HashCode; // At this point, we know we have entries.
                 if (oldEntries[i].Next >= -1)
                 {
-                    ref Entry entry = ref entries[count];
+                    ref ValueGrouping<TKey, TElement> entry = ref entries![count];
                     entry = oldEntries[i];
                     ref int bucket = ref GetBucketRef(hashCode);
                     entry.Next = bucket - 1; // Value in _buckets is 1-based
@@ -280,38 +267,27 @@ namespace KeyValueSet
         
         public virtual Dictionary<TKey, TElement> ToDistinct(Func<IGrouping<TKey, TElement>, TElement> distinctAggregator)
         {
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             Dictionary<TKey, TElement> dic = new(Count);
             
-            for(int i = 0; i < entries.Length; i++)
+            for(int i = 0; i < entries!.Length; i++)
             {
-                ref Entry entry = ref entries[i];
-                switch (entry.Grouping._count)
+                ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                switch (entry._count)
                 {
                     case 0:
-                        Debug.Assert(false);
                         continue;
                     case 1:
-                        dic.Add(entry.Grouping._key, entry.Grouping[0]);
+                        dic.Add(entry._key, entry[0]);
                         break;
                     default:
-                        dic.Add(entry.Grouping._key, distinctAggregator(entry.Grouping));
+                        dic.Add(entry._key, distinctAggregator(entry.ToImmutable()));
                         break;
                 }
             }
 
             return dic;
         }
-
-        public List<IGrouping<TKey, TElement>> ToList()
-        {
-            var list = InternalToList();
-            list.TrimExcess();
-            return list;
-        }
-
-        public IGrouping<TKey, TElement>[] ToArray() => InternalToList().ToArray();
-
         public List<KeyValuePair<TKey, TElement>> ToFlatList()
         {
             var list = InternalToFlatList();
@@ -328,17 +304,15 @@ namespace KeyValueSet
         bool ICollection<IGrouping<TKey, TElement>>.IsReadOnly => false;
 
         /// <inheritdoc />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void ICollection<IGrouping<TKey, TElement>>.Add(IGrouping<TKey, TElement> items) => Add(items.Key, items);
 
         /// <summary>Adds an element to the current set and returns a value to indicate if the element was successfully added.</summary>
         /// <param name="items">The element to add to the set.</param>
         /// <returns><see langword="true"/> if a new group was added to the set; <see langword="false"/> if the items were added to an existing group.</returns>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Add(IGrouping<TKey, TElement> items)
         {
             bool created = CreateIfNotPresent(items.Key, out int location);
-            AddToExisting(location, items);
+            _entries![location].AddRange(items);
             return created;
         }
 
@@ -356,58 +330,42 @@ namespace KeyValueSet
             m_count = 0;
             _freeList = -1;
             _freeCount = 0;
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             for (int i = 0; i < entries.Length; i++)
-            {
-                ref Entry entry = ref _entries[i];
-                entry.Grouping.Dispose();
-            }
+                ClearEntry(ref entries[i]);
             Array.Clear(_entries, 0, count);
         }
 
-        /// <inheritdoc />
-        public override bool Contains(IGrouping<TKey, TElement> elements)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ClearEntry(ref ValueGrouping<TKey, TElement> entry)
         {
-            int location = FindItemIndex(elements.Key, out _);
-            if (location < 0)
-                return false;
-            
-            ref Entry entry = ref _entries![location];
-            var elementComparer = EqualityComparer<TElement>.Default;
-            
-            foreach (TElement element in elements)
-            {
-                if (!entry.Grouping.Contains(element, elementComparer))
-                    return false;
-            }
-
-            return true;
+            entry._elements = null;
+            entry = default!;
         }
+
+        /// <inheritdoc />
+        public override bool Contains(IGrouping<TKey, TElement> elements) => GroupingContainsElements(elements.Key, elements);
 
         public override void CopyTo(IGrouping<TKey, TElement>[] array, int arrayIndex, int count)
         {
-            // Check array index valid index into array.
             if (arrayIndex < 0)
-                throw new ArgumentOutOfRangeException(nameof(arrayIndex), arrayIndex, "Value must be greater or equal to zero.");
+                ThrowHelper.ThrowArgumentOutOfRangeException_ValueGreaterOrEqualZero(ExceptionArgument.arrayIndex, arrayIndex);
 
-            // Also throw if count less than 0.
             if (count < 0)
-                throw new ArgumentOutOfRangeException(nameof(count), count, "Value must be greater or equal to zero.");
+                ThrowHelper.ThrowArgumentOutOfRangeException_ValueGreaterOrEqualZero(ExceptionArgument.count, count);
 
-            // Will the array, starting at arrayIndex, be able to hold elements? Note: not
-            // checking arrayIndex >= array.Length (consistency with list of allowing
-            // count of 0; subsequent check takes care of the rest)
             if (arrayIndex > array.Length || count > array.Length - arrayIndex)
-                ThrowHelper.ThrowArgumentException("Array as insufficient capacity.");
+                ThrowHelper.ThrowArgumentException_ArrayCapacity(ExceptionArgument.array);
 
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             for (int i = 0; i < m_count && count != 0; i++)
             {
-                ref Entry entry = ref entries[i];
-                if (entry.Next < -1)
-                    continue;
-                array[arrayIndex++] = entry.Grouping;
-                count--;
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                if (entry.Next >= -1)
+                {
+                    array[arrayIndex++] = entry.ToImmutable();
+                    count--;
+                }
             }
         }
 
@@ -415,10 +373,7 @@ namespace KeyValueSet
         public override IEnumerator<IGrouping<TKey, TElement>> GetEnumerator() => new Enumerator(this);
         
         /// <inheritdoc />
-        IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>> IEnumerable<KeyValuePair<TKey, IEnumerable<TElement>>>.GetEnumerator() => new DictionaryEnumerator(new Enumerator(this));
-
-        /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>> IEnumerable<KeyValuePair<TKey, IEnumerable<TElement>>>.GetEnumerator() => new DictionaryEnumerator(this);
 
 #endregion
 
@@ -437,9 +392,9 @@ namespace KeyValueSet
             else
             {
                 info.AddValue(CapacityName, _buckets.Length);
-                Grouping<TKey, TElement>[] array = new Grouping<TKey, TElement>[Count];
+                ValueGrouping<TKey, TElement>[] array = new ValueGrouping<TKey, TElement>[Count];
                 CopyTo(array.AsSpan(), 0);
-                info.AddValue(ElementsName, array, typeof(Grouping<TKey, TElement>[]));
+                info.AddValue(ElementsName, array, typeof(ValueGrouping<TKey, TElement>[]));
             }
         }
 
@@ -462,16 +417,17 @@ namespace KeyValueSet
             if (capacity != 0)
             {
                 _buckets = new int[capacity];
-                _entries = new Entry[capacity];
+                ValueGrouping<TKey, TElement>[] entries = _entries = new ValueGrouping<TKey, TElement>[capacity];
 #if TARGET_64BIT
                 _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)capacity);
 #endif
-                
-                var array = (Grouping<TKey, TElement>[])_siInfo.GetValue(ElementsName, typeof(Grouping<TKey, TElement>[]))!;
-                foreach (Grouping<TKey, TElement> grouping in array)
+
+                var array = (ValueGrouping<TKey, TElement>[])_siInfo.GetValue(ElementsName, typeof(ValueGrouping<TKey, TElement>[]))!;
+                foreach (ValueGrouping<TKey, TElement> entry in array)
                 {
-                    CreateIfNotPresent(grouping._key, out int location);
-                    AddToExisting(location, grouping);
+                    CreateIfNotPresent(entry._key, out int location);
+                    if (entry._elements != null)
+                        entries[location].AddRange(entry._elements);
                 }
             }
             else
@@ -489,9 +445,21 @@ namespace KeyValueSet
         
         internal bool ShouldTrimExcess => m_count > 0 && _entries!.Length / m_count > ShrinkThreshold;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static IEqualityComparer<GroupingSet<TKey, TElement>> CreateSetComparer() => new GroupingSetEqualityComparer<TKey, TElement>();
 
+
+        /// <summary>Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private ref int GetBucketRef(int hashCode)
+        {
+            int[] buckets = _buckets!;
+#if TARGET_64BIT
+            return ref buckets[HashHelpers.FastMod((uint)hashCode, (uint)buckets.Length, _fastModMultiplier)];
+#else
+            return ref buckets[(uint)hashCode % (uint)buckets.Length];
+#endif
+        }
+        
         /// <summary>
         /// Initializes buckets and slots arrays. Uses suggested capacity by finding next prime
         /// greater than or equal to capacity.
@@ -500,7 +468,7 @@ namespace KeyValueSet
         {
             int size = HashHelpers.GetPrime(capacity);
             var buckets = new int[size];
-            var entries = new Entry[size];
+            var entries = new ValueGrouping<TKey, TElement>[size];
 
             // Assign member variables after both arrays are allocated to guard against corruption from OOM if second fails.
             _freeList = -1;
@@ -532,7 +500,7 @@ namespace KeyValueSet
             if (threshold >= capacity)
             {
                 _buckets = (int[])source._buckets.Clone();
-                _entries = (Entry[])source._entries!.Clone();
+                _entries = (ValueGrouping<TKey, TElement>[])source._entries!.Clone();
                 _freeList = source._freeList;
                 _freeCount = source._freeCount;
                 m_count = source.m_count;
@@ -544,15 +512,16 @@ namespace KeyValueSet
             {
                 Initialize(source.Count);
 
-                Entry[]? entries = source._entries;
+                ValueGrouping<TKey, TElement>[]? entries = source._entries;
                 for (int i = 0; i < source.m_count; i++)
                 {
-                    ref Entry entry = ref entries![i];
-                    if (entry.Next < -1)
-                        continue;
-
-                    CreateIfNotPresent(entry.Grouping._key, out int location);
-                    AddToExisting(location, entry.Grouping);
+                    ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                    if (entry.Next >= -1)
+                    {
+                        CreateIfNotPresent(entry._key, out int location);
+                        if (entry._elements != null)
+                            entries[location].AddRange(entry._elements);
+                    }
                 }
             }
 
@@ -562,7 +531,8 @@ namespace KeyValueSet
         /// <summary>Adds the specified element to the set if it's not already contained.</summary>
         /// <param name="key">The element to add to the set.</param>
         /// <param name="location">The index into <see cref="_entries"/> of the element.</param>
-        /// <returns>true if the element is added to the <see cref="GroupingSet{TKey,TElement}"/> object; false if the element is already present.</returns>
+        /// <returns>true if the element is added to the <see cref="KeyValueCollection.GroupingSet{TKey,TElement}"/> object; false if the element is already present.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool CreateIfNotPresent(in TKey key, out int location)
         {
             if (_buckets == null)
@@ -571,7 +541,7 @@ namespace KeyValueSet
             }
             Debug.Assert(_buckets != null);
 
-            Entry[]? entries = _entries;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             Debug.Assert(entries != null, "expected entries to be non-null");
 
             IEqualityComparer<TKey>? comparer = _comparer;
@@ -590,8 +560,8 @@ namespace KeyValueSet
                     // ValueType: Devirtualize with EqualityComparer<TValue>.Default intrinsic
                     while (i >= 0)
                     {
-                        ref Entry entry = ref entries[i];
-                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry.Grouping._key, key))
+                        ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry._key, key))
                         {
                             location = i;
                             return false;
@@ -609,8 +579,8 @@ namespace KeyValueSet
                     EqualityComparer<TKey> defaultComparer = EqualityComparer<TKey>.Default;
                     while (i >= 0)
                     {
-                        ref Entry entry = ref entries[i];
-                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry.Grouping._key, key))
+                        ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry._key, key))
                         {
                             location = i;
                             return false;
@@ -629,8 +599,8 @@ namespace KeyValueSet
                 int i = bucket - 1; // Value in _buckets is 1-based
                 while (i >= 0)
                 {
-                    ref Entry entry = ref entries[i];
-                    if (entry.HashCode == hashCode && comparer.Equals(entry.Grouping._key, key))
+                    ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                    if (entry.HashCode == hashCode && comparer.Equals(entry._key, key))
                     {
                         location = i;
                         return false;
@@ -647,7 +617,7 @@ namespace KeyValueSet
             {
                 index = _freeList;
                 _freeCount--;
-                Debug.Assert((StartOfFreeList - entries![_freeList].Next) >= -1, "shouldn't overflow because `next` cannot underflow");
+                Debug.Assert(StartOfFreeList - entries![_freeList].Next >= -1, "shouldn't overflow because `next` cannot underflow");
                 _freeList = StartOfFreeList - entries[_freeList].Next;
             }
             else
@@ -664,10 +634,10 @@ namespace KeyValueSet
             }
 
             {
-                ref Entry entry = ref entries![index];
+                ref ValueGrouping<TKey, TElement> entry = ref entries![index];
                 entry.HashCode = hashCode;
                 entry.Next = bucket - 1; // Value in _buckets is 1-based
-                entry.Grouping = new Grouping<TKey, TElement>(key, hashCode);
+                entry = new ValueGrouping<TKey, TElement>(key, hashCode);
                 bucket = index + 1;
                 _version++;
                 location = index;
@@ -687,6 +657,7 @@ namespace KeyValueSet
         }
         
         /// <summary>Gets the index of the items in <see cref="_entries"/>, or -1 if it's not in the set.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int FindItemIndex(in TKey key, out int hashCode)
         {
             int[]? buckets = _buckets;
@@ -696,7 +667,7 @@ namespace KeyValueSet
                 return -1;
             }
             
-            Entry[]? entries = _entries;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             Debug.Assert(entries != null, "Expected _entries to be initialized");
 
             uint collisionCount = 0;
@@ -711,8 +682,8 @@ namespace KeyValueSet
                     int i = GetBucketRef(hashCode) - 1; // Value in _buckets is 1-based
                     while (i >= 0)
                     {
-                        ref Entry entry = ref entries[i];
-                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry.Grouping._key, key))
+                        ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry._key, key))
                         {
                             return i;
                         }
@@ -730,8 +701,8 @@ namespace KeyValueSet
                     int i = GetBucketRef(hashCode) - 1; // Value in _buckets is 1-based
                     while (i >= 0)
                     {
-                        ref Entry entry = ref entries[i];
-                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry.Grouping._key, key))
+                        ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry._key, key))
                         {
                             return i;
                         }
@@ -748,8 +719,8 @@ namespace KeyValueSet
                 int i = GetBucketRef(hashCode) - 1; // Value in _buckets is 1-based
                 while (i >= 0)
                 {
-                    ref Entry entry = ref entries[i];
-                    if (entry.HashCode == hashCode && comparer.Equals(entry.Grouping._key, key))
+                    ref ValueGrouping<TKey, TElement> entry = ref entries[i];
+                    if (entry.HashCode == hashCode && comparer.Equals(entry._key, key))
                     {
                         return i;
                     }
@@ -762,18 +733,6 @@ namespace KeyValueSet
             return -1;
         }
 
-        /// <summary>Adds the <paramref name="items"/> to the bucket at the index.</summary>
-        /// <param name="location">The index of in the <see cref="_buckets"/> array.</param>
-        /// <param name="items">The items to add.</param>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int AddToExisting(int location, IEnumerable<TElement> items)
-        {
-            Debug.Assert((uint)location < (uint)_buckets!.Length, "(uint)location < (uint)_buckets!.Length");
-            ref Entry entry = ref _entries![location];
-            return entry.Grouping.AddRange(items);
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Resize() => Resize(HashHelpers.ExpandPrime(m_count), false);
 
         private void Resize(int newSize, bool forceNewHashCodes)
@@ -783,7 +742,7 @@ namespace KeyValueSet
             Debug.Assert(_entries != null, "_entries should be non-null");
             Debug.Assert(newSize >= _entries.Length);
 
-            var entries = new Entry[newSize];
+            var entries = new ValueGrouping<TKey, TElement>[newSize];
 
             int count = m_count;
             Array.Copy(_entries, entries, count);
@@ -796,7 +755,7 @@ namespace KeyValueSet
             
             for (int i = 0; i < count; i++)
             {
-                ref Entry entry = ref entries[i];
+                ref ValueGrouping<TKey, TElement> entry = ref entries[i];
                 if (entry.Next >= -1)
                 {
                     ref int bucket = ref GetBucketRef(entry.HashCode);
@@ -808,56 +767,44 @@ namespace KeyValueSet
             _entries = entries;
         }
         
-        /// <summary>Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ref int GetBucketRef(int hashCode)
-        {
-            int[] buckets = _buckets!;
-#if TARGET_64BIT
-            return ref buckets[HashHelpers.FastMod((uint)hashCode, (uint)buckets.Length, _fastModMultiplier)];
-#else
-            return ref buckets[(uint)hashCode % (uint)buckets.Length];
-#endif
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal void CopyTo(in Span<Grouping<TKey, TElement>> span, int index)
+        internal void CopyTo(in Span<ValueGrouping<TKey, TElement>> span, int index)
         {
             Debug.Assert(index >= 0, "index >= 0");
             int count = m_count;
             Debug.Assert(span.Length <= count - index, "span.Length <= count - index");
 
-            Entry[] entries = _entries!;
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
             for (int i = 0; i < count; i++)
             {
-                ref Entry entry = ref entries[i];
-                span[i] = entry.Grouping;
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                span[i] = entry;
             }
         }
 
         protected virtual List<KeyValuePair<TKey, TElement>> InternalToFlatList()
         {
             List<KeyValuePair<TKey, TElement>> list = new(Count * 3 / 2);
-            Entry[] entries = _entries!;
-            for (int i = 0; i < entries.Length; i++)
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
+            for (int i = 0; i < entries!.Length; i++)
             {
-                ref Entry entry = ref entries[i];
-                TKey key = entry.Grouping._key;
-                list.AddRange(entry.Grouping.Select(x => KeyValuePair.Create(key, x)));
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
+                TKey key = entry._key;
+                foreach (TElement element in entry)
+                    list.Add(new(key, element));
             }
 
             return list;
         }
 
-        protected virtual List<IGrouping<TKey, TElement>> InternalToList()
+        protected override List<IGrouping<TKey, TElement>> InternalToList()
         {
             List<IGrouping<TKey, TElement>> list = new(Count * 3 / 2);
-            Entry[] entries = _entries!;
-            for (int i = 0; i < entries.Length; i++)
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
+            for (int i = 0; i < entries!.Length; i++)
             {
-                ref Entry entry = ref entries[i];
+                ref ValueGrouping<TKey, TElement> entry = ref entries![i];
                 // Groupings may dispose outside of our & user control, we need to clone them.
-                list.Add(new Grouping<TKey, TElement>(entry.Grouping));
+                list.Add(entry.ToImmutable());
             }
             
             return list;
@@ -869,21 +816,18 @@ namespace KeyValueSet
                 // The chain of entries forms a loop, which means a concurrent update has happened.
                 ThrowHelper.ThrowInvalidOperationException_ConcurrentOperationsNotSupported();
         }
+
+        internal bool GroupingContainsElements(TKey key, in IEnumerable<TElement> elements)
+        {
+            if (FindItemIndex(key, out int location) >= 0)
+            {
+                ref ValueGrouping<TKey, TElement> entry = ref _entries![location];
+                return entry.ContainsAll(elements, EqualityComparer<TElement>.Default);
+            }
+
+            return false;
+        }
         
 #endregion
-
-        private struct Entry
-        {
-            public int HashCode;
-            
-            /// <summary>
-            /// 0-based index of next entry in chain: -1 means end of chain
-            /// also encodes whether this entry _itself_ is part of the free list by changing sign and subtracting 3,
-            /// so -2 means end of free list, -3 means index 0 but on free list, -4 means index 1 but on free list, etc.
-            /// </summary>
-            public int Next;
-
-            public Grouping<TKey, TElement> Grouping;
-        }
     }
 }
