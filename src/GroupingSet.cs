@@ -119,6 +119,21 @@ namespace KeyValueCollection
             }
         }
 
+        public GroupingSet(IReadOnlyDictionary<TKey, TElement> dictionary)
+            : this(dictionary, null) { }
+
+        public GroupingSet(IReadOnlyDictionary<TKey, TElement> dictionary, IEqualityComparer<TKey>? comparer)
+            : this(comparer)
+        {
+            Initialize(dictionary.Count);
+            ValueGrouping<TKey, TElement>[]? entries = _entries;
+            foreach(var pair in dictionary)
+            {
+                CreateIfNotPresent(pair.Key, out int location);
+                entries![location].Add(pair.Value);
+            }
+        }
+
         protected GroupingSet(SerializationInfo info, StreamingContext context)
         {
             // We can't do anything with the keys and values until the entire graph has been
