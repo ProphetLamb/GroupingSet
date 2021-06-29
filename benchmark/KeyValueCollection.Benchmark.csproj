@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net5.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <OutputType>Exe</OutputType>
+    </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="BenchmarkDotNet" Version="0.13.0" />
+      <PackageReference Include="Bogus" Version="33.0.2" />
+      <PackageReference Include="FluentAssertions" Version="5.10.3" />
+      <PackageReference Include="GenericRange" Version="0.1.0" />
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\src\KeyValueCollection.csproj" />
+      <ProjectReference Include="..\tests\KeyValueCollection.Tests.csproj" />
+    </ItemGroup>
+</Project>
