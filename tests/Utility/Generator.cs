@@ -2,16 +2,22 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
 
 using Bogus;
 
 using FluentAssertions;
 
-namespace KeyValueCollection.Tests
+using GenericRange;
+using GenericRange.Extensions;
+
+namespace KeyValueCollection.Tests.Utility
 {
     public static class Generator
     {
-
+        private static readonly Range<double> _zeroOneD = new(0, 1);
+        private static readonly Range<float> _zeroOneF = new(0, 1);
+        
         public static void ShouldHaveKeysAndValues<TKey, TElement>(this GroupingSet<TKey, TElement> set, TKey[] keys, IEnumerable<TElement>[] elements)
         {
             Debug.Assert(keys.Length == elements.Length);
@@ -35,21 +41,21 @@ namespace KeyValueCollection.Tests
             return faker.Generate(count).ToArray();
         }
 
-        public static double[][] GetRandomNumbersMatrix(int rows, int cols, double minIncl, double maxExcl, Random random)
+        public static double[][] GetRandomNumbersMatrix(int rows, int cols, Range<double> range, Random random)
         {
             double[][] matrix = new double[rows][];
             for (int i = 0; i < rows; i++)
             {
-                matrix[i] = GetRandomNumbers(cols, minIncl, maxExcl, random);
+                matrix[i] = GetRandomNumbers(cols, range, random);
             }
             return matrix;
         }
 
-        public static double[] GetRandomNumbers(int count, double minIncl, double maxExcl, Random random)
+        public static double[] GetRandomNumbers(int count, Range<double> range, Random random)
         {
             double[] array = new double[count];
             for (int i = 0; i < count; i++)
-                array[i] = minIncl + random.NextDouble() * maxExcl;
+                array[i] = _zeroOneD.Map(range, random.NextDouble());
             return array;
         }
 
@@ -58,6 +64,19 @@ namespace KeyValueCollection.Tests
             string[] keys = new Faker<string>().RuleFor(s => s, f => f.Name.FirstName()).Generate(count).ToArray();
             string[] values = new Faker<string>().RuleFor(s => s, f => f.Name.LastName()).Generate(count).ToArray();
             return keys.Zip(values).ToArray();
+        }
+
+        public static Vector3[] GetRandomVector3s(int count, Range<float> xRange, Range<float> yRange, Range<float> zRange, Random random)
+        {
+            Vector3[] array = new Vector3[count];
+            for (int i = 0; i < count; i++)
+                array[i] = GetRandomVector3(xRange, yRange, zRange, random);
+            return array;
+        }
+        
+        public static Vector3 GetRandomVector3(Range<float> xRange, Range<float> yRange, Range<float> zRange, Random random)
+        {
+            return new(_zeroOneF.Map(xRange, (float)random.NextDouble()), _zeroOneF.Map(yRange, (float)random.NextDouble()), _zeroOneF.Map(zRange, (float)random.NextDouble()));
         }
     }
 }
