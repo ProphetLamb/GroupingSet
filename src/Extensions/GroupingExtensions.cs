@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -10,9 +11,9 @@ namespace KeyValueCollection.Extensions
         internal static ImmutableGrouping<TKey, TElement> ToImmutable<TKey, TElement>(this ValueGrouping<TKey, TElement> grouping)
             where TKey : notnull
         {
-            if (grouping._elements != null)
-                return new(grouping._elements, grouping._key, grouping.HashCode);
-            return new(Enumerable.Empty<TElement>(), grouping._key, grouping.HashCode);
+            if (grouping.Elements != null)
+                return new(grouping.Elements.AsSpan(0, grouping.Count), grouping.Key, grouping.HashCode);
+            return new(Enumerable.Empty<TElement>(), grouping.Key, grouping.HashCode);
         }
 
         internal static ImmutableGrouping<TKey, TElement> ToImmutable<TKey, TElement>(this IGrouping<TKey, TElement> grouping)
