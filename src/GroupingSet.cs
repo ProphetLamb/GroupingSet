@@ -638,7 +638,7 @@ namespace KeyValueCollection
                 ref ValueGrouping<TKey, TElement> entry = ref entries![index];
                 entry.HashCode = hashCode;
                 entry.Next = bucket - 1; // Value in _buckets is 1-based
-                entry = new ValueGrouping<TKey, TElement>(key, hashCode);
+                entry.KeyValue = key;
                 bucket = index + 1;
                 _version++;
                 location = index;
