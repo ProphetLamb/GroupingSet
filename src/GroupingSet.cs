@@ -150,6 +150,7 @@ namespace KeyValueCollection
         /// <summary>Gets the <see cref="IEqualityComparer"/> object that is used to determine equality for the values in the set.</summary>
         public IEqualityComparer<TKey> Comparer => _comparer ?? EqualityComparer<TKey>.Default;
 
+        /// <summary>Indicates whether the set is empty.</summary>
         public bool IsEmpty => m_count == 0;
 
         /// <inheritdoc />
@@ -158,6 +159,8 @@ namespace KeyValueCollection
         ///<inheritdoc />
         public ICollection<IEnumerable<TElement>> Values => _values  ?? (ICollection<IEnumerable<TElement>>)Array.Empty<IEnumerable<TElement>>();
 
+        /// <summary>Returns the reference to the grouping.</summary>
+        /// <value>The key of the grouping.</value>
         public ref ValueGrouping<TKey, TElement> this[TKey key]
         {
             get
@@ -192,8 +195,9 @@ namespace KeyValueCollection
 
             return Initialize(capacity);
         }
-        
+
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryGetValue(in TKey key, [NotNullWhen(true)] out ValueGrouping<TKey, TElement>? value)
         {
             int location = FindItemIndex(key, out _);
@@ -206,7 +210,8 @@ namespace KeyValueCollection
             value = null;
             return false;
         }
-        
+
+        /// <inheritdoc />
         public int Add(in TKey key, IEnumerable<TElement> elements)
         {
             CreateIfNotPresent(key, out int location);
@@ -214,6 +219,7 @@ namespace KeyValueCollection
             return location;
         }
 
+        /// <inheritdoc />
         public void Add(in TKey key, TElement element)
         {
             CreateIfNotPresent(key, out int location);
@@ -241,7 +247,7 @@ namespace KeyValueCollection
         }
 
         /// <summary>
-        /// Sets the capacity of a <see cref="KeyValueCollection.GroupingSet{TKey,TElement}"/> object to the actual number of elements it contains,
+        /// Sets the capacity of a <see cref="GroupingSet{TKey,TElement}"/> object to the actual number of elements it contains,
         /// rounded up to a nearby, implementation-specific value.
         /// </summary>
         public void TrimExcess()
@@ -277,12 +283,21 @@ namespace KeyValueCollection
             _freeCount = 0;
         }
 
+        /// <summary>Casts the set to <see cref="ICollection{IGrouping{TKey, TElement}}"/>.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ICollection<IGrouping<TKey, TElement>> AsEnumerable() => this;
 
+        /// <summary>Casts the set to <see cref="IDictionary{TKey, IEnumerable{TElement}}"/>.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public IDictionary<TKey, IEnumerable<TElement>> AsDictionary() => this;
 
+        /// <summary>Casts the set to <see cref="ILookup{TKey, TElement}"/>.</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ILookup<TKey, TElement> AsLookup() => this;
 
+        /// <summary>Creates a <see cref="Dictionary{TKey, TElement}"/> from the set using a aggregator function to obtain a element representing the grouping.</summary>
+        /// <param name="distinctAggregator">The aggregator function used to obtain a element representing the grouping.</param>
+        /// <returns>A new <see cref="Dictionary{TKey, TElement}"/> with all keys of the set.</returns>
         public virtual Dictionary<TKey, TElement> ToDistinct(Func<IGrouping<TKey, TElement>, TElement> distinctAggregator)
         {
             ValueGrouping<TKey, TElement>[]? entries = _entries;
@@ -307,6 +322,8 @@ namespace KeyValueCollection
             return dic;
         }
 
+        /// <summary>Flattens the set assigning each element is each grouping the respective key.</summary>
+        /// <returns>A list of <see cref="KeyValuePair{TKey, TElement}"/>s representing each element in each grouping and the respective key.</returns>
         public List<KeyValuePair<TKey, TElement>> ToFlatList()
         {
             var list = InternalToFlatList();
@@ -314,6 +331,8 @@ namespace KeyValueCollection
             return list;
         }
 
+        /// <summary>Flattens the set assigning each element is each grouping the respective key.</summary>
+        /// <returns>A array of <see cref="KeyValuePair{TKey, TElement}"/>s representing each element in each grouping and the respective key.</returns>
         public KeyValuePair<TKey, TElement>[] ToFlatArray() => InternalToFlatList().ToArray();
 
 #endregion
@@ -355,14 +374,8 @@ namespace KeyValueCollection
             Array.Clear(_entries, 0, count);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void ClearEntry(ref ValueGrouping<TKey, TElement> entry)
-        {
-            entry.Elements = null;
-            entry = default!;
-        }
-
         /// <inheritdoc />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override bool Contains(IGrouping<TKey, TElement> elements) => GroupingContainsElements(elements.Key, elements);
 
         public override void CopyTo(IGrouping<TKey, TElement>[] array, int arrayIndex, int count)
@@ -393,6 +406,8 @@ namespace KeyValueCollection
         
         /// <inheritdoc />
         IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>> IEnumerable<KeyValuePair<TKey, IEnumerable<TElement>>>.GetEnumerator() => new DictionaryEnumerator(this);
+
+        public static IEqualityComparer<GroupingSet<TKey, TElement>> CreateSetComparer() => new GroupingSetEqualityComparer<TKey, TElement>();
 
 #endregion
 
@@ -466,8 +481,12 @@ namespace KeyValueCollection
         
         internal bool ShouldTrimExcess => m_count > 0 && _entries!.Length / m_count > ShrinkThreshold;
 
-        internal static IEqualityComparer<GroupingSet<TKey, TElement>> CreateSetComparer() => new GroupingSetEqualityComparer<TKey, TElement>();
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ClearEntry(ref ValueGrouping<TKey, TElement> entry)
+        {
+            entry.Elements = null;
+            entry = default!;
+        }
 
         /// <summary>Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
