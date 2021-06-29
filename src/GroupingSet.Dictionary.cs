@@ -23,7 +23,7 @@ namespace KeyValueCollection
         /// <inheritdoc cref="IDictionary{TKey,TValue}.this" />
         IEnumerable<TElement> IDictionary<TKey, IEnumerable<TElement>>.this[TKey key]
         {
-            get => this[key].Elements ?? Enumerable.Empty<TElement>();
+            get => this[key].GetSegment();
             set
             {
                 this[key] = value switch {
@@ -34,7 +34,7 @@ namespace KeyValueCollection
         }
 
         /// <inheritdoc />
-        IEnumerable<TElement> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.this[TKey key] => this[key].Elements ?? Enumerable.Empty<TElement>();
+        IEnumerable<TElement> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.this[TKey key] => this[key].GetSegment();
 
         /// <inheritdoc />
         void ICollection<KeyValuePair<TKey, IEnumerable<TElement>>>.Add(KeyValuePair<TKey, IEnumerable<TElement>> item) => Add(item.Key, item.Value);
@@ -52,30 +52,30 @@ namespace KeyValueCollection
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IReadOnlyDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement>? value)
+        bool IReadOnlyDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement> value)
         {
             int location = FindItemIndex(key, out _);
             if (location >= 0)
             {
-                value = _entries![location].Elements ?? Enumerable.Empty<TElement>();
+                value = _entries![location].GetSegment();
                 return true;
             }
 
-            value = null;
+            value = null!;
             return false;
         }
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement>? value)
+        bool IDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement> value)
         {
             if (TryGetValue(key, out ValueGrouping<TKey, TElement>? grouping))
             {
-                value = grouping.Value.Elements ?? Enumerable.Empty<TElement>();
+                value = grouping.Value.GetSegment();
                 return true;
             }
 
-            value = null;
+            value = null!;
             return false;
         }
 
@@ -105,7 +105,7 @@ namespace KeyValueCollection
             for (int i = 0; i < entries!.Length; i++)
             {
                 ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                array[i + arrayIndex] = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.Elements ?? Enumerable.Empty<TElement>());
+                array[i + arrayIndex] = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.GetSegment());
             }
         }
 
@@ -118,7 +118,7 @@ namespace KeyValueCollection
         public bool Contains(TKey key) => ContainsKey(key);
 
         /// <inheritdoc />
-        IEnumerable<TElement> ILookup<TKey, TElement>.this[TKey key] => this[key].Elements ?? Enumerable.Empty<TElement>();
+        IEnumerable<TElement> ILookup<TKey, TElement>.this[TKey key] => this[key].GetSegment();
 
 #endregion
     }

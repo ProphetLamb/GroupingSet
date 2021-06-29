@@ -87,6 +87,8 @@ namespace KeyValueCollection.Grouping
             set => Elements![index] = value;
         }
 
+        internal Span<TElement> ElementsSpan => Elements != null ? Elements.AsSpan(0, _count) : Span<TElement>.Empty;
+
 #endregion
 
 #region Public members
@@ -102,8 +104,10 @@ namespace KeyValueCollection.Grouping
         }
 
         /// <inheritdoc />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(TElement item) => IndexOf(item, EqualityComparer<TElement>.Default);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(TElement item, IEqualityComparer<TElement> comparer)
         {
             if (Elements != null)
@@ -140,7 +144,10 @@ namespace KeyValueCollection.Grouping
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(TElement item) => Elements != null && Elements.Contains(item);
+        public bool Contains(TElement item) => Contains(item, EqualityComparer<TElement>.Default);
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Contains(TElement item, IEqualityComparer<TElement> comparer) => IndexOf(item, comparer) >= 0;
 
         public bool ContainsAll(IEnumerable<TElement> items, IEqualityComparer<TElement> comparer)
         {
@@ -159,9 +166,6 @@ namespace KeyValueCollection.Grouping
             return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(TElement item, IEqualityComparer<TElement> comparer) => IndexOf(item, comparer) >= 0;
-        
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(TElement item)
@@ -204,11 +208,15 @@ namespace KeyValueCollection.Grouping
         public int AddRange(ReadOnlySpan<TElement> span)
         {
             int added = span.Length;
-            int count = _count;
-            if (Elements == null || added >= Elements.Length - count)
-                Grow(added);
-            span.CopyTo(Elements!.AsSpan(count));
-            _count += added;
+            if (added != 0)
+            {
+             
+                int count = _count;
+                if (Elements == null || added >= Elements.Length - count)
+                    Grow(added);
+                span.CopyTo(Elements!.AsSpan(count));
+                _count += added;   
+            }
             return added;
         }
 
@@ -319,8 +327,10 @@ namespace KeyValueCollection.Grouping
                 Array.Copy(Elements, 0, array, arrayIndex, _count);
         }
 
+        /// <inheritdoc />
         public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
 
+        /// <inheritdoc />
         IEnumerator IEnumerable.GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
 
         public int Resize()
@@ -354,7 +364,7 @@ namespace KeyValueCollection.Grouping
             if (Elements != null)
             {
                 Debug.Assert(additionalCapacityBeyondCount > 0, "additionalCapacityBeyondCount > 0");
-                Debug.Assert(_count > Elements.Length - additionalCapacityBeyondCount, "_count > _elements.Length - additionalCapacityBeyondCount");
+                Debug.Assert(_count > Elements.Length - additionalCapacityBeyondCount, "_count > Elements.Length - additionalCapacityBeyondCount");
 
                 TElement[] array = new TElement[(int)Math.Max((uint)(_count + additionalCapacityBeyondCount), (uint)(Elements.Length * 2))];
 
@@ -374,7 +384,9 @@ namespace KeyValueCollection.Grouping
                 Elements = new TElement[Math.Max(additionalCapacityBeyondCount, 4)];
             }
         }
-        
+
+        internal ArraySegment<TElement> GetSegment() => Elements != null ? new(Elements, 0, _count) : ArraySegment<TElement>.Empty;
+
 #endregion
     }
 }

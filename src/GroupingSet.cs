@@ -130,7 +130,8 @@ namespace KeyValueCollection
             foreach(var pair in dictionary)
             {
                 CreateIfNotPresent(pair.Key, out int location);
-                entries![location].Add(pair.Value);
+                ref ValueGrouping<TKey, TElement> entry = ref entries![location];
+                entry.Add(pair.Value);
             }
         }
 
@@ -211,15 +212,16 @@ namespace KeyValueCollection
             return false;
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc cref="IDictionary{TKey,TElement}.Add(TKey,TElement)" />
         public int Add(in TKey key, IEnumerable<TElement> elements)
         {
             CreateIfNotPresent(key, out int location);
-            _entries![location].AddRange(elements);
+            ref ValueGrouping<TKey, TElement> grouping = ref _entries![location];
+            grouping.AddRange(elements);
             return location;
         }
 
-        /// <inheritdoc />
+        /// <inheritdoc cref="IDictionary{TKey,TElement}.Add(TKey,TElement)" />
         public void Add(in TKey key, TElement element)
         {
             CreateIfNotPresent(key, out int location);
@@ -283,16 +285,13 @@ namespace KeyValueCollection
             _freeCount = 0;
         }
 
-        /// <summary>Casts the set to <see cref="ICollection{IGrouping{TKey, TElement}}"/>.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>Casts the set to <see cref="ICollection{T}"/>.</summary>
         public ICollection<IGrouping<TKey, TElement>> AsEnumerable() => this;
 
-        /// <summary>Casts the set to <see cref="IDictionary{TKey, IEnumerable{TElement}}"/>.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /// <summary>Casts the set to <see cref="IDictionary{TKey, TItem}"/>.</summary>
         public IDictionary<TKey, IEnumerable<TElement>> AsDictionary() => this;
 
         /// <summary>Casts the set to <see cref="ILookup{TKey, TElement}"/>.</summary>
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ILookup<TKey, TElement> AsLookup() => this;
 
         /// <summary>Creates a <see cref="Dictionary{TKey, TElement}"/> from the set using a aggregator function to obtain a element representing the grouping.</summary>
@@ -371,7 +370,7 @@ namespace KeyValueCollection
             ValueGrouping<TKey, TElement>[]? entries = _entries;
             for (int i = 0; i < entries.Length; i++)
                 ClearEntry(ref entries[i]);
-            Array.Clear(_entries, 0, count);
+            Array.Clear(entries, 0, count);
         }
 
         /// <inheritdoc />
@@ -457,11 +456,11 @@ namespace KeyValueCollection
 #endif
 
                 var array = (ValueGrouping<TKey, TElement>[])_siInfo.GetValue(ElementsName, typeof(ValueGrouping<TKey, TElement>[]))!;
-                foreach (ValueGrouping<TKey, TElement> entry in array)
+                foreach (ValueGrouping<TKey, TElement> grouping in array)
                 {
-                    CreateIfNotPresent(entry.Key, out int location);
-                    if (entry.Elements != null)
-                        entries[location].AddRange((IEnumerable<TElement>)entry.Elements);
+                    CreateIfNotPresent(grouping.Key, out int location);
+                    ref ValueGrouping<TKey, TElement> entry = ref entries[location];
+                    entry.AddRange(grouping.ElementsSpan);
                 }
             }
             else
@@ -484,7 +483,6 @@ namespace KeyValueCollection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ClearEntry(ref ValueGrouping<TKey, TElement> entry)
         {
-            entry.Elements = null;
             entry = default!;
         }
 
@@ -556,12 +554,15 @@ namespace KeyValueCollection
                 ValueGrouping<TKey, TElement>[]? entries = source._entries;
                 for (int i = 0; i < source.m_count; i++)
                 {
-                    ref ValueGrouping<TKey, TElement> entry = ref entries![i];
-                    if (entry.Next >= -1)
+                    ref ValueGrouping<TKey, TElement> grouping = ref entries![i];
+                    if (grouping.Next >= -1)
                     {
-                        CreateIfNotPresent(entry.Key, out int location);
-                        if (entry.Elements != null)
-                            entries[location].AddRange((IEnumerable<TElement>)entry.Elements);
+                        CreateIfNotPresent(grouping.Key, out int location);
+                        if (grouping.ElementsSpan != null)
+                        {
+                            ref ValueGrouping<TKey, TElement> entry = ref _entries![location];
+                            entry.AddRange(grouping.ElementsSpan);
+                        }
                     }
                 }
             }
@@ -589,8 +590,12 @@ namespace KeyValueCollection
             int hashCode;
 
             uint collisionCount = 0;
+#if NET5_0
             ref int bucket = ref Unsafe.NullRef<int>();
-
+ #else
+            int __bucket = -1;
+            ref int bucket = ref __bucket;
+#endif
             if (comparer == null)
             {
                 hashCode = key.GetHashCode();
@@ -868,7 +873,7 @@ namespace KeyValueCollection
 
             return false;
         }
-        
+
 #endregion
     }
 }

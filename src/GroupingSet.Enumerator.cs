@@ -92,7 +92,7 @@ namespace KeyValueCollection
                     ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
                     if (entry.Next >= -1)
                     {
-                        _current = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.Elements ?? Enumerable.Empty<TElement>());
+                        _current = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.GetSegment());
                         return true;
                     }
                 }
@@ -200,7 +200,7 @@ namespace KeyValueCollection
             {
                 var en = new Enumerator(_set);
                 while (en.MoveNext())
-                    array[arrayIndex++] = en.CurrentValue.Elements ?? Enumerable.Empty<TElement>();
+                    array[arrayIndex++] = en.CurrentValue.GetSegment();
             }
 
             /// <inheritdoc />
