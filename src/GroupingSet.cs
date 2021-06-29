@@ -63,6 +63,7 @@ namespace KeyValueCollection
         private IEqualityComparer<TKey>? _comparer;
         private SerializationInfo? _siInfo;
         private KeyCollection? _keys;
+        private ValueCollection? _values;
 
 #endregion
 
@@ -137,10 +138,10 @@ namespace KeyValueCollection
         public bool IsEmpty => m_count == 0;
         
         /// <inheritdoc />
-        public ICollection<TKey> Keys => _keys!;
+        public ICollection<TKey> Keys => _keys ?? (ICollection<TKey>)Array.Empty<TKey>();
 
-        /// <inheritdoc cref="IDictionary{TKey,TValue}.Values" />
-        public ICollection<IGrouping<TKey, TElement>> Values => this;
+        ///<inheritdoc />
+        public ICollection<IEnumerable<TElement>> Values => _values  ?? (ICollection<IEnumerable<TElement>>)Array.Empty<IEnumerable<TElement>>();
 
         public ref ValueGrouping<TKey, TElement> this[TKey key]
         {
@@ -482,6 +483,7 @@ namespace KeyValueCollection
 #endif
             
             _keys = new KeyCollection(this);
+            _values = new ValueCollection(this);
 
             return size;
         }
