@@ -12,7 +12,7 @@ namespace KeyValueCollection.Grouping
 {
     [DebuggerDisplay("Key: {Key}, Count: {Count}")]
     [DebuggerTypeProxy(typeof(IGroupingDebugView<,>))]
-    internal sealed class ImmutableGrouping<TKey, TElement> :
+    public sealed class ImmutableGrouping<TKey, TElement> :
         IGrouping<TKey, TElement>,
         ICollection<TElement>,
         IReadOnlyList<TElement>,
@@ -29,7 +29,7 @@ namespace KeyValueCollection.Grouping
 
 #region Ctors
 
-        public ImmutableGrouping(IEnumerable<TElement> elements, TKey key, int keyHashCode)
+        internal ImmutableGrouping(IEnumerable<TElement> elements, TKey key, int keyHashCode)
         {
             _elements = elements.ToArray();
             _count = _elements.Length;
@@ -37,7 +37,7 @@ namespace KeyValueCollection.Grouping
             Key = key;
         }
 
-        public ImmutableGrouping(ReadOnlySpan<TElement> elements, TKey key, int keyHashCode)
+        internal ImmutableGrouping(ReadOnlySpan<TElement> elements, TKey key, int keyHashCode)
         {
             _elements = elements.ToArray();
             _count = _elements.Length;
