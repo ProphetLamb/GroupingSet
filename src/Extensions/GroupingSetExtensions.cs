@@ -10,6 +10,7 @@ namespace KeyValueCollection.Extensions
         {
             return new(sequence);
         }
+
         public static GroupingSet<TKey, TElement> ToSet<TKey, TElement> (this IEnumerable<IGrouping<TKey, TElement>> sequence, IEqualityComparer<TKey> comparer)
             where TKey : notnull
         {

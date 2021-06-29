@@ -273,21 +273,22 @@ namespace KeyValueCollection
             for(int i = 0; i < entries!.Length; i++)
             {
                 ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                switch (entry._count)
+                switch (entry.Count)
                 {
                     case 0:
                         continue;
                     case 1:
-                        dic.Add(entry._key, entry[0]);
+                        dic.Add(entry.Key, entry[0]);
                         break;
                     default:
-                        dic.Add(entry._key, distinctAggregator(entry.ToImmutable()));
+                        dic.Add(entry.Key, distinctAggregator(entry.ToImmutable()));
                         break;
                 }
             }
 
             return dic;
         }
+
         public List<KeyValuePair<TKey, TElement>> ToFlatList()
         {
             var list = InternalToFlatList();
@@ -339,7 +340,7 @@ namespace KeyValueCollection
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void ClearEntry(ref ValueGrouping<TKey, TElement> entry)
         {
-            entry._elements = null;
+            entry.Elements = null;
             entry = default!;
         }
 
@@ -425,9 +426,9 @@ namespace KeyValueCollection
                 var array = (ValueGrouping<TKey, TElement>[])_siInfo.GetValue(ElementsName, typeof(ValueGrouping<TKey, TElement>[]))!;
                 foreach (ValueGrouping<TKey, TElement> entry in array)
                 {
-                    CreateIfNotPresent(entry._key, out int location);
-                    if (entry._elements != null)
-                        entries[location].AddRange(entry._elements);
+                    CreateIfNotPresent(entry.Key, out int location);
+                    if (entry.Elements != null)
+                        entries[location].AddRange((IEnumerable<TElement>)entry.Elements);
                 }
             }
             else
@@ -518,9 +519,9 @@ namespace KeyValueCollection
                     ref ValueGrouping<TKey, TElement> entry = ref entries![i];
                     if (entry.Next >= -1)
                     {
-                        CreateIfNotPresent(entry._key, out int location);
-                        if (entry._elements != null)
-                            entries[location].AddRange(entry._elements);
+                        CreateIfNotPresent(entry.Key, out int location);
+                        if (entry.Elements != null)
+                            entries[location].AddRange((IEnumerable<TElement>)entry.Elements);
                     }
                 }
             }
@@ -561,7 +562,7 @@ namespace KeyValueCollection
                     while (i >= 0)
                     {
                         ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry._key, key))
+                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry.Key, key))
                         {
                             location = i;
                             return false;
@@ -580,7 +581,7 @@ namespace KeyValueCollection
                     while (i >= 0)
                     {
                         ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry._key, key))
+                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry.Key, key))
                         {
                             location = i;
                             return false;
@@ -600,7 +601,7 @@ namespace KeyValueCollection
                 while (i >= 0)
                 {
                     ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                    if (entry.HashCode == hashCode && comparer.Equals(entry._key, key))
+                    if (entry.HashCode == hashCode && comparer.Equals(entry.Key, key))
                     {
                         location = i;
                         return false;
@@ -683,7 +684,7 @@ namespace KeyValueCollection
                     while (i >= 0)
                     {
                         ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry._key, key))
+                        if (entry.HashCode == hashCode && EqualityComparer<TKey>.Default.Equals(entry.Key, key))
                         {
                             return i;
                         }
@@ -702,7 +703,7 @@ namespace KeyValueCollection
                     while (i >= 0)
                     {
                         ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry._key, key))
+                        if (entry.HashCode == hashCode && defaultComparer.Equals(entry.Key, key))
                         {
                             return i;
                         }
@@ -720,7 +721,7 @@ namespace KeyValueCollection
                 while (i >= 0)
                 {
                     ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                    if (entry.HashCode == hashCode && comparer.Equals(entry._key, key))
+                    if (entry.HashCode == hashCode && comparer.Equals(entry.Key, key))
                     {
                         return i;
                     }
@@ -788,7 +789,7 @@ namespace KeyValueCollection
             for (int i = 0; i < entries!.Length; i++)
             {
                 ref ValueGrouping<TKey, TElement> entry = ref entries![i];
-                TKey key = entry._key;
+                TKey key = entry.Key;
                 foreach (TElement element in entry)
                     list.Add(new(key, element));
             }

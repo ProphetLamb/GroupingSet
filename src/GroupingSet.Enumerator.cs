@@ -1,8 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
-using KeyValueCollection.Base;
+using KeyValueCollection.DebugViews;
 using KeyValueCollection.Exceptions;
 using KeyValueCollection.Grouping;
 
@@ -14,15 +15,15 @@ namespace KeyValueCollection
         {
             private readonly GroupingSet<TKey, TElement> _set;
             private readonly int _version;
-            private int _index;
-            private IGrouping<TKey, TElement> _current;
+            internal int Index;
+            internal ValueGrouping<TKey, TElement> CurrentValue;
 
             internal Enumerator(GroupingSet<TKey, TElement> set)
             {
                 _set = set;
                 _version = set._version;
-                _index = 0;
-                _current = default!;
+                Index = 0;
+                CurrentValue = default!;
             }
 
             public bool MoveNext()
@@ -32,33 +33,33 @@ namespace KeyValueCollection
 
                 // Use unsigned comparison since we set index to dictionary.count+1 when the enumeration ends.
                 // dictionary.count+1 could be negative if dictionary.count is int.MaxValue
-                while ((uint)_index < (uint)_set.m_count)
+                while ((uint)Index < (uint)_set.m_count)
                 {
-                    ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
+                    ref ValueGrouping<TKey, TElement> entry = ref _set._entries![Index++];
                     if (entry.Next >= -1)
                     {
-                        _current = entry;
+                        CurrentValue = entry;
                         return true;
                     }
                 }
 
-                _index = _set.m_count + 1;
-                _current = default!;
+                Index = _set.m_count + 1;
+                CurrentValue = default!;
                 return false;
             }
 
             /// <inheritdoc />
             public void Reset()
             {
-                _index = 0;
-                _current = default!;
+                Index = 0;
+                CurrentValue = default!;
             }
 
             /// <inheritdoc />
-            public IGrouping<TKey, TElement> Current => _current;
+            public IGrouping<TKey, TElement> Current => CurrentValue;
 
             /// <inheritdoc />
-            object IEnumerator.Current => _current;
+            object IEnumerator.Current => CurrentValue;
 
             /// <inheritdoc />
             public void Dispose() { }
@@ -91,7 +92,7 @@ namespace KeyValueCollection
                     ref ValueGrouping<TKey, TElement> entry = ref _set._entries![_index++];
                     if (entry.Next >= -1)
                     {
-                        _current = new KeyValuePair<TKey, IEnumerable<TElement>>(entry._key, entry._elements ?? Enumerable.Empty<TElement>());
+                        _current = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.Elements ?? Enumerable.Empty<TElement>());
                         return true;
                     }
                 }

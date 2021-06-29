@@ -11,7 +11,7 @@ using KeyValueCollection.Utility;
 
 namespace KeyValueCollection.Grouping
 {
-    [DebuggerDisplay("Key: \"{Key}\", Count: {Count}")]
+    [DebuggerDisplay("Key: {Key}, Count: {Count}")]
     [DebuggerTypeProxy(typeof(IGroupingDebugView<,>))]
     public struct ValueGrouping<TKey, TElement> : 
         IGrouping<TKey, TElement>,
@@ -21,7 +21,7 @@ namespace KeyValueCollection.Grouping
     {
 #region Fields
 
-        internal readonly TKey _key;
+        internal TKey KeyValue;
         internal int HashCode;
         /// <summary>
         /// 0-based index of next entry in chain: -1 means end of chain
@@ -29,8 +29,8 @@ namespace KeyValueCollection.Grouping
         /// so -2 means end of free list, -3 means index 0 but on free list, -4 means index 1 but on free list, etc.
         /// </summary>
         internal int Next;
-        internal TElement[]? _elements;
-        internal int _count;
+        internal TElement[]? Elements;
+        private int _count;
         
 #endregion
 
@@ -38,56 +38,42 @@ namespace KeyValueCollection.Grouping
 
         internal ValueGrouping(TKey key, int hashCode)
         {
-            _key = key;
+            KeyValue = key;
             HashCode = hashCode;
             Next = 0;
-            _elements = null;
+            Elements = null;
             _count = 0;
         }
 
         internal ValueGrouping(TKey key, int hashCode, IEnumerable<TElement> elements)
+            : this(key, hashCode)
         {
-            _key = key;
-            HashCode = hashCode;
-            Next = 0;
+            AddRange(elements);
+        }
 
-            switch (elements)
+        internal ValueGrouping(TKey key, int hashCode, ReadOnlySpan<TElement> elements)
+            : this(key, hashCode)
             {
-                case ICollection<TElement> collection:
-                    _count = collection.Count;
-                    _elements = new TElement[_count];
-                    collection.CopyTo(_elements, 0);
-                    break;
-                case IReadOnlyCollection<TElement> sequence:
-                    _count = 0;
-                    _elements = new TElement[sequence.Count];
-                    AddRange(sequence);
-                    break;
-                default:
-                    _count = 0;
-                    _elements = null;
                     AddRange(elements);
-                    break;
-            }
         }
 
         internal ValueGrouping(ValueGrouping<TKey, TElement> source)
         {
-            _key = source._key;
+            KeyValue = source.Key;
             HashCode = source.HashCode;
             Next = 0;
-            _elements = Array.Empty<TElement>();
+            Elements = Array.Empty<TElement>();
             _count = 0;
             
             Grow(source._count);
-            source.CopyTo(_elements!, 0);
+            source.CopyTo(Elements!, 0);
         }
         
 #endregion
 
 #region Properties
         
-        public TKey Key => _key;
+        public TKey Key => KeyValue;
 
         public int Count => _count;
 
@@ -97,8 +83,8 @@ namespace KeyValueCollection.Grouping
         /// <inheritdoc cref="IList{T}.this" />
         public TElement this[int index]
         {
-            get => _elements![index];
-            set => _elements![index] = value;
+            get => Elements![index];
+            set => Elements![index] = value;
         }
 
 #endregion
@@ -108,9 +94,9 @@ namespace KeyValueCollection.Grouping
         /// <inheritdoc />
         public void Clear()
         {
-            if (_elements != null)
+            if (Elements != null)
             {
-                Array.Clear(_elements, 0, _count);
+                Array.Clear(Elements, 0, _count);
                 _count = 0;
             }
         }
@@ -120,13 +106,13 @@ namespace KeyValueCollection.Grouping
 
         public int IndexOf(TElement item, IEqualityComparer<TElement> comparer)
         {
-            if (_elements != null)
+            if (Elements != null)
             {
-                for (int i = 0; i < _elements.Length; i++)
+                for (int i = 0; i < Elements.Length; i++)
                 {
                     if (i >= _count) // Skip bound checks by looping over all elements
                         return -1;
-                    if (comparer.Equals(_elements[i], item))
+                    if (comparer.Equals(Elements[i], item))
                         return i;
                 }
             }
@@ -138,13 +124,13 @@ namespace KeyValueCollection.Grouping
         
         public int IndexOfLast(TElement item, IEqualityComparer<TElement> comparer)
         {
-            if (_elements != null)
+            if (Elements != null)
             {
-                for (int i = _elements.Length - 1; i >= 0; i--)
+                for (int i = Elements.Length - 1; i >= 0; i--)
                 {
                     if (i >= _count) // Skip bound checks by looping over all elements
                         return -1;
-                    if (comparer.Equals( _elements[i], item))
+                    if (comparer.Equals( Elements[i], item))
                         return i;
                 }
             }
@@ -154,11 +140,11 @@ namespace KeyValueCollection.Grouping
 
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Contains(TElement item) => _elements != null && _elements.Contains(item);
+        public bool Contains(TElement item) => Elements != null && Elements.Contains(item);
 
         public bool ContainsAll(IEnumerable<TElement> items, IEqualityComparer<TElement> comparer)
         {
-            if (_elements != null)
+            if (Elements != null)
             {
                 foreach (TElement element in items)
                 {
@@ -180,51 +166,69 @@ namespace KeyValueCollection.Grouping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(TElement item)
         {
-            if (_elements == null || _count >= _elements.Length - 1)
+            if (Elements == null || _count >= Elements.Length - 1)
                 Grow(1);
-            _elements![_count] = item;
+            Elements![_count] = item;
+            _count++;
         }
 
         public int AddRange(IEnumerable<TElement> items)
         {
-            if (items is ICollection<TElement> collection)
+            int count = _count;
+            int added;
+            switch (items)
             {
-                int count = collection.Count;
-                int last = _count;
-                if (_elements == null || count >= _elements.Length - last)
-                    Grow(count);
-                collection.CopyTo(_elements!, _count);
-                _count += count;
-                return count;
-            }
-
-            int added = 0;
+                case ICollection<TElement> collection:
+                    added = collection.Count;
+                    if (Elements == null || added >= Elements.Length - count)
+                        Grow(added);
+                    collection.CopyTo(Elements!, count);
+                    _count += added;
+                    return added;
+                case IReadOnlyCollection<TElement> sequence:
+                    added = sequence.Count;
+                    if (Elements == null || added >= Elements.Length - count)
+                        Grow(added);
+                    goto default;
+                default:
+                    added = 0;
             foreach (TElement element in items)
             {
                 Add(element);
                 added++;
             }
+                    return added;
+            }
+        }
 
+        public int AddRange(ReadOnlySpan<TElement> span)
+        {
+            int added = span.Length;
+            int count = _count;
+            if (Elements == null || added >= Elements.Length - count)
+                Grow(added);
+            span.CopyTo(Elements!.AsSpan(count));
+            _count += added;
             return added;
         }
 
         public void Insert(int index, TElement item)
         {
-            if (_elements == null || _count > _elements.Length - 1)
+            if (Elements == null || _count > Elements.Length - 1)
                 Grow(1);
             int remaining = _count - index;
-            _elements.AsSpan(index, remaining).CopyTo(_elements.AsSpan(index + 1));
-            _elements![index] = item;
+            Elements.AsSpan(index, remaining).CopyTo(Elements.AsSpan(index + 1));
+            Elements![index] = item;
             _count++;
         }
         
         public void Insert(int index, ReadOnlySpan<TElement> items)
         {
-            if (_elements == null || _count > _elements.Length - items.Length)
+            if (Elements == null || _count > Elements.Length - items.Length)
                 Grow(items.Length);
             int remaining = _count - index;
-            _elements.AsSpan(index, remaining).CopyTo(_elements.AsSpan(index + items.Length));
-            items.CopyTo(_elements.AsSpan(index, items.Length));
+            Elements.AsSpan(index, remaining).CopyTo(Elements.AsSpan(index + items.Length));
+            items.CopyTo(Elements.AsSpan(index, items.Length));
             _count += items.Length;
         }
 
@@ -303,39 +307,43 @@ namespace KeyValueCollection.Grouping
             TElement[] tempPool = ArrayPool<TElement>.Shared.Rent(count - next);
             Span<TElement> rightPart = tempPool.AsSpan(count - next);
             
-            _elements.AsSpan(next).CopyTo(rightPart);
-            rightPart.CopyTo(_elements.AsSpan(index));
+            Elements.AsSpan(next).CopyTo(rightPart);
+            rightPart.CopyTo(Elements.AsSpan(index));
             
             ArrayPool<TElement>.Shared.Return(tempPool);
         }
         
         public void CopyTo(TElement[] array, int arrayIndex)
         {
-            if (_elements != null)
-                Array.Copy(_elements, 0, array, arrayIndex, _count);
+            if (Elements != null)
+                Array.Copy(Elements, 0, array, arrayIndex, _count);
         }
 
-        public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(_elements, 0, _count);
+        public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
 
-        IEnumerator IEnumerable.GetEnumerator() => new ArraySegmentEnumerator<TElement>(_elements, 0, _count);
+        IEnumerator IEnumerable.GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
 
         public int Resize()
         {
-            int size = _elements != null ? _elements.Length : 0;
+            int size = Elements != null ? Elements.Length : 0;
             
             if (_count == 0 && size != 0)
             {
-                _elements = null;
+                Elements = null;
                 return 0;
             }
             
             if (_count < size && size > 4)
             {
-                Array.Resize(ref _elements, _count);
+                Array.Resize(ref Elements, _count);
             }
 
             return size;
         }
+
+        public static ValueGrouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping) => new(grouping.Key, grouping.Key.GetHashCode(), grouping);
+
+        public static ValueGrouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping, IEqualityComparer<TKey> hashCreator) => new(grouping.Key, hashCreator.GetHashCode(grouping.Key), grouping);
 
 #endregion
 
@@ -343,27 +351,27 @@ namespace KeyValueCollection.Grouping
         
         private void Grow(int additionalCapacityBeyondCount)
         {
-            if (_elements != null)
+            if (Elements != null)
             {
                 Debug.Assert(additionalCapacityBeyondCount > 0, "additionalCapacityBeyondCount > 0");
-                Debug.Assert(_count > _elements.Length - additionalCapacityBeyondCount, "_count > _elements.Length - additionalCapacityBeyondCount");
+                Debug.Assert(_count > Elements.Length - additionalCapacityBeyondCount, "_count > _elements.Length - additionalCapacityBeyondCount");
 
-                TElement[] array = new TElement[(int)Math.Max((uint)(_count + additionalCapacityBeyondCount), (uint)(_elements.Length * 2))];
+                TElement[] array = new TElement[(int)Math.Max((uint)(_count + additionalCapacityBeyondCount), (uint)(Elements.Length * 2))];
 
-                if (_elements.Length != 0)
+                if (Elements.Length != 0)
                 {
-                    _elements.AsSpan(0, _count).CopyTo(array);
-                    _elements = array;
+                    Elements.AsSpan(0, _count).CopyTo(array);
+                    Elements = array;
                 }
                 else
                 {
-                    _elements = array;
+                    Elements = array;
                 }
             }
             else
             {
                 Debug.Assert(_count == 0, "_count == 0");
-                _elements = new TElement[Math.Max(additionalCapacityBeyondCount, 4)];
+                Elements = new TElement[Math.Max(additionalCapacityBeyondCount, 4)];
             }
         }
         

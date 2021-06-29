@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -13,8 +14,6 @@ namespace KeyValueCollection
 
         /// <inheritdoc />
         IEnumerable<TKey> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.Keys => Keys;
-        
-        ICollection<IEnumerable<TElement>> IDictionary<TKey, IEnumerable<TElement>>.Values => new ValueCollection(this);
 
         /// <inheritdoc />
         IEnumerable<IEnumerable<TElement>> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.Values => Values;
@@ -24,7 +23,7 @@ namespace KeyValueCollection
         /// <inheritdoc cref="IDictionary{TKey,TValue}.this" />
         IEnumerable<TElement> IDictionary<TKey, IEnumerable<TElement>>.this[TKey key]
         {
-            get => this[key]._elements ?? Enumerable.Empty<TElement>();
+            get => this[key].Elements ?? Enumerable.Empty<TElement>();
             set
             {
                 this[key] = value switch {
@@ -35,7 +34,7 @@ namespace KeyValueCollection
         }
 
         /// <inheritdoc />
-        IEnumerable<TElement> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.this[TKey key] => this[key]._elements ?? Enumerable.Empty<TElement>();
+        IEnumerable<TElement> IReadOnlyDictionary<TKey, IEnumerable<TElement>>.this[TKey key] => this[key].Elements ?? Enumerable.Empty<TElement>();
 
         /// <inheritdoc />
         void ICollection<KeyValuePair<TKey, IEnumerable<TElement>>>.Add(KeyValuePair<TKey, IEnumerable<TElement>> item) => Add(item.Key, item.Value);
@@ -57,7 +56,7 @@ namespace KeyValueCollection
             int location = FindItemIndex(key, out _);
             if (location >= 0)
             {
-                value = _entries![location]._elements ?? Enumerable.Empty<TElement>();
+                value = _entries![location].Elements ?? Enumerable.Empty<TElement>();
                 return true;
             }
 
@@ -71,7 +70,7 @@ namespace KeyValueCollection
         {
             if (TryGetValue(key, out ValueGrouping<TKey, TElement>? grouping))
             {
-                value = grouping.Value._elements ?? Enumerable.Empty<TElement>();
+                value = grouping.Value.Elements ?? Enumerable.Empty<TElement>();
                 return true;
             }
 
@@ -105,7 +104,7 @@ namespace KeyValueCollection
             for (int i = 0; i < entries!.Length; i++)
             {
                 ref ValueGrouping<TKey, TElement> entry = ref entries[i];
-                array[i + arrayIndex] = new KeyValuePair<TKey, IEnumerable<TElement>>(entry._key, entry._elements ?? Enumerable.Empty<TElement>());
+                array[i + arrayIndex] = new KeyValuePair<TKey, IEnumerable<TElement>>(entry.Key, entry.Elements ?? Enumerable.Empty<TElement>());
             }
         }
 
@@ -118,7 +117,7 @@ namespace KeyValueCollection
         public bool Contains(TKey key) => ContainsKey(key);
 
         /// <inheritdoc />
-        IEnumerable<TElement> ILookup<TKey, TElement>.this[TKey key] => this[key]._elements ?? Enumerable.Empty<TElement>();
+        IEnumerable<TElement> ILookup<TKey, TElement>.this[TKey key] => this[key].Elements ?? Enumerable.Empty<TElement>();
 
 #endregion
     }
