@@ -12,35 +12,29 @@ namespace KeyValueCollection.Grouping
 {
     [DebuggerDisplay("Key: {Key}, Count: {Count}")]
     [DebuggerTypeProxy(typeof(IGroupingDebugView<,>))]
-    public sealed class ImmutableGrouping<TKey, TElement> :
+    public sealed class ReadOnlyGrouping<TKey, TElement> :
         IGrouping<TKey, TElement>,
         ICollection<TElement>,
         IReadOnlyList<TElement>,
-        IEquatable<ImmutableGrouping<TKey, TElement>>,
+        IEquatable<ReadOnlyGrouping<TKey, TElement>>,
         IEquatable<IGrouping<TKey, TElement>>
     {
 #region Fields
 
-        private readonly TElement[] _elements;
+        private readonly TElement[]? _elements;
+        private readonly int _startIndex;
+        private readonly int _endIndex;
         private readonly int _hashCode;
-        private readonly int _count;
         
 #endregion
 
 #region Ctors
 
-        internal ImmutableGrouping(IEnumerable<TElement> elements, TKey key, int keyHashCode)
+        internal ReadOnlyGrouping(TElement[]? elements, int startIndex, int endIndex, TKey key, int keyHashCode)
         {
-            _elements = elements.ToArray();
-            _count = _elements.Length;
-            _hashCode = keyHashCode;
-            Key = key;
-        }
-
-        internal ImmutableGrouping(ReadOnlySpan<TElement> elements, TKey key, int keyHashCode)
-        {
-            _elements = elements.ToArray();
-            _count = _elements.Length;
+            _elements = elements;
+            _startIndex = startIndex;
+            _endIndex = endIndex;
             _hashCode = keyHashCode;
             Key = key;
         }
@@ -53,7 +47,7 @@ namespace KeyValueCollection.Grouping
         public TKey Key { get; }
 
         /// <inheritdoc cref="ICollection{T}.Count" />
-        public int Count => _count;
+        public int Count => _endIndex - _startIndex;
 
         /// <inheritdoc />
         public bool IsReadOnly => true;
@@ -63,9 +57,9 @@ namespace KeyValueCollection.Grouping
         {
             get
             {
-                if ((uint)_count >= (uint)index)
+                if ((uint)(_endIndex - _startIndex) >= (uint)index)
                     ThrowHelper.ThrowIndexOutOfRangeException();
-                return _elements[index];
+                return _elements![index - _startIndex];
             }
         }
 
@@ -74,10 +68,10 @@ namespace KeyValueCollection.Grouping
 #region Public members
 
         /// <inheritdoc />
-        public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(_elements, 0, _count);
+        public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(_elements, _startIndex, _endIndex);
 
         /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => new ArraySegmentEnumerator<TElement>(_elements, _startIndex, _endIndex);
 
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
@@ -90,10 +84,20 @@ namespace KeyValueCollection.Grouping
         void ICollection<TElement>.Clear() => throw ThrowHelper.GetNotSupportedException();
 
         /// <inheritdoc />
-        public bool Contains(TElement item) => _elements.Contains(item);
+        public bool Contains(TElement item)
+        {
+            IEqualityComparer<TElement> comparer = EqualityComparer<TElement>.Default;
+            for (int i = _startIndex; i < _endIndex; i++)
+            {
+                if (!comparer.Equals(item, _elements![i]))
+                    continue;
+                return true;
+            }
+            return false;
+        }
 
         /// <inheritdoc />
-        public void CopyTo(TElement[] array, int arrayIndex) => _elements.CopyTo(array, arrayIndex);
+        public void CopyTo(TElement[] array, int arrayIndex) => _elements?.CopyTo(array, arrayIndex);
 
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
@@ -103,7 +107,7 @@ namespace KeyValueCollection.Grouping
         /// <summary>Returns whether the <see cref="Key"/> is equal to the other <see cref="Key"/>.</summary>
         /// <param name="other">The object to compare with.</param>
         /// <returns><see langword="true"/> if the <see cref="Key"/>s are equal, otherwise; <see langword="false"/>.</returns>
-        public bool Equals(ImmutableGrouping<TKey, TElement>? other)
+        public bool Equals(ReadOnlyGrouping<TKey, TElement>? other)
         {
             if (ReferenceEquals(null, other))
                 return false;
@@ -129,7 +133,7 @@ namespace KeyValueCollection.Grouping
         public override bool Equals(object? obj)
         {
             return ReferenceEquals(this, obj)
-             || obj is ImmutableGrouping<TKey, TElement> other && Equals(other)
+             || obj is ReadOnlyGrouping<TKey, TElement> other && Equals(other)
              || obj is IGrouping<TKey, TElement> grouping && Equals(grouping);
         }
 
@@ -137,9 +141,9 @@ namespace KeyValueCollection.Grouping
         /// <returns>The hash-code of the <see cref="Key"/>.</returns>
         public override int GetHashCode() => _hashCode;
 
-        public static bool operator ==(ImmutableGrouping<TKey, TElement>? left, ImmutableGrouping<TKey, TElement>? right) => Equals(left, right);
+        public static bool operator ==(ReadOnlyGrouping<TKey, TElement>? left, ReadOnlyGrouping<TKey, TElement>? right) => Equals(left, right);
 
-        public static bool operator !=(ImmutableGrouping<TKey, TElement>? left, ImmutableGrouping<TKey, TElement>? right) => !Equals(left, right);
+        public static bool operator !=(ReadOnlyGrouping<TKey, TElement>? left, ReadOnlyGrouping<TKey, TElement>? right) => !Equals(left, right);
 
 #endregion
     }
