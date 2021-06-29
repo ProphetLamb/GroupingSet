@@ -68,7 +68,7 @@ namespace KeyValueCollection.Base
 
                 // Faster if other is a hashset using same equality comparer; so check
                 // that other is a hashset using the same equality comparer.
-                if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+                if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
                 {
                     IntersectWithHashSetWithSameComparer(otherAsSet);
                     return;
@@ -102,7 +102,7 @@ namespace KeyValueCollection.Base
                 }
 
                 // Faster if other is a hashset (and we're using same equality comparer).
-                if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+                if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
                 {
                     if (Count >= otherAsSet.Count)
                         return false;
@@ -134,7 +134,7 @@ namespace KeyValueCollection.Base
                 }
 
                 // Faster if other is a hashset with the same equality comparer
-                if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+                if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
                 {
                     if (otherAsSet.Count >= Count)
                         return false;
@@ -161,7 +161,7 @@ namespace KeyValueCollection.Base
 
             // Faster if other has unique elements according to this equality comparer; so check
             // that other is a hashset using the same equality comparer.
-            if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+            if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
             {
                 // if this has more elements then it can't be a subset
                 if (Count > otherAsSet.Count)
@@ -198,7 +198,7 @@ namespace KeyValueCollection.Base
 
                 // Try to compare based on counts alone if other is a hashset with same equality comparer.
                 if (other is TSelf otherAsSet &&
-                    EqualityComparersAreEqual((TSelf)this, otherAsSet) &&
+                    EqualityComparersAreEqual(otherAsSet) &&
                     otherAsSet.Count > Count)
                 {
                     return false;
@@ -239,7 +239,7 @@ namespace KeyValueCollection.Base
                 return true;
 
             // Faster if other is a hashset and we're using same equality comparer.
-            if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+            if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
             {
                 // Attempt to return early: since both contain unique elements, if they have
                 // different counts, then they can't be equal.
@@ -289,7 +289,7 @@ namespace KeyValueCollection.Base
             // will fail. So first check if other is a hashset using the same equality comparer;
             // symmetric except is a lot faster and avoids bit array allocations if we can assume
             // uniqueness.
-            if (other is TSelf otherAsSet && EqualityComparersAreEqual((TSelf)this, otherAsSet))
+            if (other is TSelf otherAsSet && EqualityComparersAreEqual(otherAsSet))
             {
                 SymmetricExceptWithUniqueHashSet(otherAsSet);
             }
@@ -340,7 +340,7 @@ namespace KeyValueCollection.Base
 
         protected abstract void IntersectWithHashSetWithSameComparer(TSelf otherAsSet);
 
-        internal abstract bool EqualityComparersAreEqual(TSelf setBase, TSelf otherAsSet);
+        internal abstract bool EqualityComparersAreEqual(TSelf otherAsSet);
 
         protected abstract (int, int) CheckUniqueAndUnfoundElements(IEnumerable<TItem> other, bool returnIfUnfound);
 

@@ -21,7 +21,7 @@ namespace KeyValueCollection.Utility
 
             // If both sets use the same comparer, they're equal if they're the same
             // size and one is a "subset" of the other.
-            if (left.EqualityComparersAreEqual(left, right))
+            if (left.EqualityComparersAreEqual(right))
                 return left.Count == right.Count && right.IsSubsetOfHashSetWithSameComparer(left);
 
             // Otherwise, do an O(N^2) match.

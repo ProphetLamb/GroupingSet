@@ -43,6 +43,7 @@ namespace KeyValueCollection
         void IDictionary<TKey, IEnumerable<TElement>>.Add(TKey key, IEnumerable<TElement> value) => Add(key, value);
 
         /// <inheritdoc />
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool ICollection<KeyValuePair<TKey, IEnumerable<TElement>>>.Contains(KeyValuePair<TKey, IEnumerable<TElement>> item) => GroupingContainsElements(item.Key, item.Value);
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.ContainsKey" />

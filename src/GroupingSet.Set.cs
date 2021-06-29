@@ -17,7 +17,7 @@ namespace KeyValueCollection
         /// different equality comparers, then uniqueness assumption between sets break.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal override bool EqualityComparersAreEqual(GroupingSet<TKey, TElement> left, GroupingSet<TKey, TElement> right) => left.Comparer.Equals(right.Comparer);
+        internal override bool EqualityComparersAreEqual(GroupingSet<TKey, TElement> other) => Comparer.Equals(other.Comparer);
 
         /// <summary>
         /// Checks if this contains of other's elements. Iterates over other's elements and

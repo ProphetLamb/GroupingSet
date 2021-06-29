@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-
+using System.Runtime.CompilerServices;
 using KeyValueCollection.DebugViews;
 using KeyValueCollection.Exceptions;
 using KeyValueCollection.Grouping;
@@ -125,7 +125,7 @@ namespace KeyValueCollection
         {
             private readonly GroupingSet<TKey, TElement> _set;
 
-            public KeyCollection(GroupingSet<TKey, TElement> set)
+            internal KeyCollection(GroupingSet<TKey, TElement> set)
             {
                 _set = set;
             }
@@ -143,6 +143,7 @@ namespace KeyValueCollection
             public void Clear() => _set.Clear();
 
             /// <inheritdoc />
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool Contains(TKey item) => _set.ContainsKey(item);
 
             /// <inheritdoc />
@@ -153,6 +154,10 @@ namespace KeyValueCollection
                     array[arrayIndex++] = en.CurrentValue.Key;
             }
 
+            /// <inheritdoc />
+            public bool Remove(TKey item) => _set.Remove(item);
+
+            /// <inheritdoc />
             public IEnumerator<TKey> GetEnumerator()
             {
                 using var en = new Enumerator(_set);
@@ -161,8 +166,6 @@ namespace KeyValueCollection
             }
 
             /// <inheritdoc />
-            public bool Remove(TKey item) => _set.Remove(item);
-
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
@@ -172,7 +175,7 @@ namespace KeyValueCollection
         {
             private readonly GroupingSet<TKey, TElement> _set;
 
-            public ValueCollection(GroupingSet<TKey, TElement> set)
+            internal ValueCollection(GroupingSet<TKey, TElement> set)
             {
                 _set = set;
             }
@@ -203,6 +206,7 @@ namespace KeyValueCollection
             /// <inheritdoc />
             bool ICollection<IEnumerable<TElement>>.Remove(IEnumerable<TElement> item) => throw ThrowHelper.GetNotSupportedException();
 
+            /// <inheritdoc />
             public IEnumerator<IEnumerable<TElement>> GetEnumerator()
             {
                 var en = new Enumerator(_set);
@@ -210,6 +214,7 @@ namespace KeyValueCollection
                     yield return en.CurrentValue;
             }
 
+            /// <inheritdoc />
             IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
         }
     }
