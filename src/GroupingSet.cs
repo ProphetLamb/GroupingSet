@@ -438,6 +438,8 @@ namespace KeyValueCollection
             }
 
             _version = _siInfo.GetInt32(VersionName);
+
+            _siInfo = null;
         }
 
 #endregion
