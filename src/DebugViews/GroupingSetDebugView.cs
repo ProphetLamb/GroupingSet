@@ -4,12 +4,12 @@ using KeyValueCollection.Grouping;
 
 namespace KeyValueCollection.DebugViews
 {
-    public class GroupingSetDebugView<TKey, TElement>
+    internal sealed class GroupingSetDebugView<TKey, TElement>
         where TKey : notnull
     {
-        private KeyValueCollection.GroupingSet<TKey, TElement> _set;
+        private readonly GroupingSet<TKey, TElement> _set;
 
-        public GroupingSetDebugView(KeyValueCollection.GroupingSet<TKey, TElement> set)
+        public GroupingSetDebugView(GroupingSet<TKey, TElement> set)
         {
             _set = set;
         }
