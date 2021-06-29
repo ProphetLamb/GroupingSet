@@ -30,7 +30,7 @@ namespace KeyValueCollection
         where TKey : notnull
     {
 #region Fields
-        
+
         // This uses the same array-based implementation as Dictionary<TKey, TValue>.
 
         // Constants for serialization
@@ -38,10 +38,10 @@ namespace KeyValueCollection
         private const string ElementsName = "Elements"; // Do not rename (binary serialization)
         private const string ComparerName = "Comparer"; // Do not rename (binary serialization)
         private const string VersionName = "Version"; // Do not rename (binary serialization)
-        
+
         /// <summary>Cutoff point for stackallocs. This corresponds to the number of ints.</summary>
         private const int StackAllocThreshold = 100;
-        
+
         /// <summary>
         /// When constructing a hashset from an existing collection, it may contain duplicates,
         /// so this is used as the max acceptable excess ratio of capacity to count. Note that
@@ -51,7 +51,7 @@ namespace KeyValueCollection
         /// </summary>
         internal const int ShrinkThreshold = 3;
         private const int StartOfFreeList = -3;
-        
+
         private int[]? _buckets;
         private ValueGrouping<TKey, TElement>[]? _entries;
 #if TARGET_64BIT
@@ -77,9 +77,9 @@ namespace KeyValueCollection
                 _comparer = comparer;
         }
 
-        public GroupingSet(int capacity) 
+        public GroupingSet(int capacity)
             : this(capacity, null) { }
-        
+
         public GroupingSet(int capacity, IEqualityComparer<TKey>? comparer)
             : this(comparer)
         {
@@ -88,7 +88,7 @@ namespace KeyValueCollection
             if (capacity > 0)
                 Initialize(capacity);
         }
-        
+
         public GroupingSet(IEnumerable<IGrouping<TKey, TElement>> groupings)
             : this(groupings, null) { }
 
@@ -151,7 +151,7 @@ namespace KeyValueCollection
         public IEqualityComparer<TKey> Comparer => _comparer ?? EqualityComparer<TKey>.Default;
 
         public bool IsEmpty => m_count == 0;
-        
+
         /// <inheritdoc />
         public ICollection<TKey> Keys => _keys ?? (ICollection<TKey>)Array.Empty<TKey>();
 
@@ -170,7 +170,7 @@ namespace KeyValueCollection
         }
 
 #endregion
-        
+
 #region Public members
 
         /// <summary>Ensures that this hash set can hold the specified number of elements without growing.</summary>
@@ -277,15 +277,17 @@ namespace KeyValueCollection
             _freeCount = 0;
         }
 
+        public ICollection<IGrouping<TKey, TElement>> AsEnumerable() => this;
+
         public IDictionary<TKey, IEnumerable<TElement>> AsDictionary() => this;
 
         public ILookup<TKey, TElement> AsLookup() => this;
-        
+
         public virtual Dictionary<TKey, TElement> ToDistinct(Func<IGrouping<TKey, TElement>, TElement> distinctAggregator)
         {
             ValueGrouping<TKey, TElement>[]? entries = _entries;
             Dictionary<TKey, TElement> dic = new(Count);
-            
+
             for(int i = 0; i < entries!.Length; i++)
             {
                 ref ValueGrouping<TKey, TElement> entry = ref entries[i];
