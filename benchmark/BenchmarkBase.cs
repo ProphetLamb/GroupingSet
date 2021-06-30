@@ -45,17 +45,5 @@ namespace KeyValueCollection.Benchmark
 
             return (hashSet, listDictionary, groupingSet);
         }
-
-        public virtual (Person[] people, Vector3[][] metrics) GenerateSampleData(int count, int vectorFieldSize, Random rng)
-        {
-            Person[] people = Generator.GetRandomPeople(count);
-
-            Range<float> range = new(-3.14f, 3.14f);
-            Vector3[][] metrics = new Vector3[count][];
-            for (int i = 0; i < count; i++)
-                metrics[i] = Generator.GetRandomVector3s(vectorFieldSize, range, range, range, rng);
-            return (people, metrics);
-        }
-
     }
 }
