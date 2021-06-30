@@ -256,35 +256,11 @@ namespace KeyValueCollection.Grouping
             return false;
         }
 
-        /// <summary>Removes all occurrences of the specified <paramref name="item"/> from the grouping.</summary>
-        /// <param name="item">The item to remove.</param>
-        /// <returns>The number of elements removed.</returns>
-        public int RemoveAll(TElement item) => RemoveAll(item, EqualityComparer<TElement>.Default);
-
-        /// <summary>Removes all occurrences of the specified <paramref name="item"/> from the grouping.</summary>
-        /// <param name="item">The item to remove.</param>
-        /// <param name="comparer">The comparer used to determine whether two elements are equal.</param>
-        /// <returns>The number of elements removed.</returns>
-        public int RemoveAll(TElement item, IEqualityComparer<TElement> comparer)
-        {
-            int removed = 0;
-            int index;
-            
-            // Use IndexOfLast in the hope to reduce the amount of slow remove operations, by hitting the last index more often.
-            while ((index = IndexOfLast(item, comparer)) >= 0)
-            {
-                RemoveAt(index);
-                removed++;
-            }
-
-            return removed;
-        }
-
         /// <summary>Removes the first occurrences of all <paramref name="items"/> from the grouping.</summary>
         /// <param name="items">The items to remove</param>
         /// <returns>The number of elements removed.</returns>
         public int RemoveAll(IEnumerable<TElement> items) => RemoveAll(items, EqualityComparer<TElement>.Default);
-        
+
         /// <summary>Removes the first occurrences of all <paramref name="items"/> from the grouping.</summary>
         /// <param name="items">The items to remove</param>
         /// <param name="comparer">The comparer used to determine whether two elements are equal.</param>
@@ -292,7 +268,7 @@ namespace KeyValueCollection.Grouping
         public int RemoveAll(IEnumerable<TElement> items, IEqualityComparer<TElement> comparer)
         {
             int removed = 0;
-            
+
             foreach (TElement element in items)
             {
                 if (Remove(element, comparer))
