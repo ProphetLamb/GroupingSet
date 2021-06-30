@@ -78,5 +78,16 @@ namespace KeyValueCollection.Tests.Utility
         {
             return new(_zeroOneF.Map(xRange, (float)random.NextDouble()), _zeroOneF.Map(yRange, (float)random.NextDouble()), _zeroOneF.Map(zRange, (float)random.NextDouble()));
         }
+
+        public static (Person[] people, Vector3[][] metrics) GenerateSampleData(int count, int vectorFieldSize, Random rng)
+        {
+            Person[] people = Generator.GetRandomPeople(count);
+
+            Range<float> range = new(-3.14f, 3.14f);
+            Vector3[][] metrics = new Vector3[count][];
+            for (int i = 0; i < count; i++)
+                metrics[i] = Generator.GetRandomVector3s(vectorFieldSize, range, range, range, rng);
+            return (people, metrics);
+        }
     }
 }
