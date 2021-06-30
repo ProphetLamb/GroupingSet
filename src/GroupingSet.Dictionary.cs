@@ -52,26 +52,13 @@ namespace KeyValueCollection
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IReadOnlyDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement> value)
+        public bool TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement> value)
         {
             int location = FindItemIndex(key, out _);
             if (location >= 0)
             {
-                value = _entries![location].GetSegment();
-                return true;
-            }
-
-            value = null!;
-            return false;
-        }
-
-        /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        bool IDictionary<TKey, IEnumerable<TElement>>.TryGetValue(TKey key, [NotNullWhen(true)] out IEnumerable<TElement> value)
-        {
-            if (TryGetValue(key, out ValueGrouping<TKey, TElement>? grouping))
-            {
-                value = grouping.Value.GetSegment();
+                ref ValueGrouping<TKey, TElement> entry = ref _entries![location];
+                value = entry.GetSegment();
                 return true;
             }
 
@@ -88,12 +75,12 @@ namespace KeyValueCollection
             int location = FindItemIndex(item.Key, out _);
             if (location < 0)
                 return false;
-            
+
             ref ValueGrouping<TKey, TElement> entry = ref _entries![location];
             var elementComparer = EqualityComparer<TElement>.Default;
 
             foreach (TElement element in item.Value)
-                entry.RemoveAll(element, elementComparer);
+                entry.Remove(element, elementComparer);
 
             return true;
         }
