@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
-
+using KeyValueCollection.DebugViews;
+using KeyValueCollection.Exceptions;
 using KeyValueCollection.Grouping;
 
 namespace KeyValueCollection
@@ -108,5 +111,121 @@ namespace KeyValueCollection
         IEnumerable<TElement> ILookup<TKey, TElement>.this[TKey key] => this[key].GetSegment();
 
 #endregion
+
+        [DebuggerDisplay("Count: {Count}")]
+        [DebuggerTypeProxy(typeof(GroupingSetKeyCollectionDebugView<,>))]
+        internal sealed class KeyCollection : ICollection<TKey>, ICollection, IReadOnlyCollection<TKey>
+        {
+            private readonly GroupingSet<TKey, TElement> _set;
+
+            internal KeyCollection(GroupingSet<TKey, TElement> set)
+            {
+                _set = set;
+            }
+
+            /// <inheritdoc />
+            public int Count => _set.Count;
+
+            /// <inheritdoc />
+            public bool IsReadOnly => false;
+
+            bool ICollection.IsSynchronized => false;
+
+            object ICollection.SyncRoot => null!;
+
+            /// <inheritdoc />
+            public void Add(TKey item) => _set.CreateIfNotPresent(item, out _);
+
+            /// <inheritdoc />
+            public void Clear() => _set.Clear();
+
+            /// <inheritdoc />
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public bool Contains(TKey item) => _set.ContainsKey(item);
+
+            void ICollection.CopyTo(Array array, int index)
+            {
+                CopyTo((TKey[])array, index);
+            }
+
+            /// <inheritdoc />
+            public void CopyTo(TKey[] array, int arrayIndex)
+            {
+                using var en = new Enumerator(_set);
+                while(en.MoveNext())
+                    array[arrayIndex++] = en.CurrentValue.Key;
+            }
+
+            /// <inheritdoc />
+            public bool Remove(TKey item) => _set.Remove(item);
+
+            /// <inheritdoc />
+            public IEnumerator<TKey> GetEnumerator() => new KeyEnumerator(_set);
+
+            /// <inheritdoc />
+            IEnumerator IEnumerable.GetEnumerator() => new KeyEnumerator(_set);
+        }
+
+        [DebuggerDisplay("Count: {Count}")]
+        [DebuggerTypeProxy(typeof(GroupingSetValueCollectionDebugView<,>))]
+        internal sealed class ValueCollection : ICollection<IEnumerable<TElement>>, ICollection, IReadOnlyCollection<IEnumerable<TElement>>
+        {
+            private readonly GroupingSet<TKey, TElement> _set;
+
+            internal ValueCollection(GroupingSet<TKey, TElement> set)
+            {
+                _set = set;
+            }
+
+            /// <inheritdoc />
+            public int Count => _set.Count;
+
+            /// <inheritdoc />
+            public bool IsReadOnly => true;
+
+            bool ICollection.IsSynchronized => false;
+
+            object ICollection.SyncRoot => null!;
+
+            /// <inheritdoc />
+            void ICollection<IEnumerable<TElement>>.Add(IEnumerable<TElement> item) => ThrowHelper.ThrowNotSupportedException();
+
+            /// <inheritdoc />
+            void ICollection<IEnumerable<TElement>>.Clear() => ThrowHelper.ThrowNotSupportedException();
+
+            /// <inheritdoc />
+            bool ICollection<IEnumerable<TElement>>.Contains(IEnumerable<TElement> item)
+            {
+                ThrowHelper.ThrowNotSupportedException();
+                return false;
+            }
+
+            /// <inheritdoc />
+            public void CopyTo(IEnumerable<TElement>[] array, int arrayIndex)
+            {
+                var en = new Enumerator(_set);
+                while (en.MoveNext())
+                    array[arrayIndex++] = en.CurrentValue.GetSegment();
+            }
+
+            /// <inheritdoc />
+            void ICollection.CopyTo(Array array, int index)
+            {
+                CopyTo((IEnumerable<TElement>[])array, index);
+            }
+
+            /// <inheritdoc />
+            bool ICollection<IEnumerable<TElement>>.Remove(IEnumerable<TElement> item)
+            {
+                ThrowHelper.ThrowNotSupportedException();
+                return false;
+            }
+
+            /// <inheritdoc />
+            public IEnumerator<IEnumerable<TElement>> GetEnumerator() => new ValueEnumerator(_set);
+
+            /// <inheritdoc />
+            IEnumerator IEnumerable.GetEnumerator() => new ValueEnumerator(_set);
+        }
     }
 }
