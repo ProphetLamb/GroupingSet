@@ -13,7 +13,7 @@ namespace KeyValueCollection.Grouping
 {
     [DebuggerDisplay("Key: {Key}, Count: {Count}")]
     [DebuggerTypeProxy(typeof(IGroupingDebugView<,>))]
-    public struct ValueGrouping<TKey, TElement> : 
+    public struct ValueGrouping<TKey, TElement> :
         IGrouping<TKey, TElement>,
         IList<TElement>,
         IReadOnlyList<TElement>
