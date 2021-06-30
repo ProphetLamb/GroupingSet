@@ -76,12 +76,12 @@ namespace KeyValueCollection.Grouping
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
         /// <exception cref="NotSupportedException">Not supported.</exception>
-        void ICollection<TElement>.Add(TElement item) => throw ThrowHelper.GetNotSupportedException();
+        void ICollection<TElement>.Add(TElement item) => ThrowHelper.ThrowNotSupportedException();
 
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
         /// <exception cref="NotSupportedException">Not supported.</exception>
-        void ICollection<TElement>.Clear() => throw ThrowHelper.GetNotSupportedException();
+        void ICollection<TElement>.Clear() => ThrowHelper.ThrowNotSupportedException();
 
         /// <inheritdoc />
         public bool Contains(TElement item)
@@ -102,7 +102,12 @@ namespace KeyValueCollection.Grouping
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
         /// <exception cref="NotSupportedException">Not supported.</exception>
-        bool ICollection<TElement>.Remove(TElement item) => throw ThrowHelper.GetNotSupportedException();
+        bool ICollection<TElement>.Remove(TElement item)
+        {
+            ThrowHelper.ThrowNotSupportedException();
+            return false;
+        }
+
 
         /// <summary>Returns whether the <see cref="Key"/> is equal to the other <see cref="Key"/>.</summary>
         /// <param name="other">The object to compare with.</param>
