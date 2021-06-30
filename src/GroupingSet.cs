@@ -22,6 +22,7 @@ namespace KeyValueCollection
     public partial class GroupingSet<TKey, TElement> : 
         HashSetBase<IGrouping<TKey, TElement>, GroupingSet<TKey, TElement>>,
         ICollection<IGrouping<TKey, TElement>>,
+        ICollection,
         IDictionary<TKey, IEnumerable<TElement>>,
         IReadOnlyDictionary<TKey, IEnumerable<TElement>>,
         ILookup<TKey, TElement>,
@@ -199,7 +200,7 @@ namespace KeyValueCollection
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetRef(in TKey key, [NotNullWhen(true)] ref ValueGrouping<TKey, TElement> value)
+        public bool TryGetRef(TKey key, [NotNullWhen(true)] ref ValueGrouping<TKey, TElement> value)
         {
             int location = FindItemIndex(key, out _);
             if (location >= 0)
@@ -211,19 +212,47 @@ namespace KeyValueCollection
         }
 
         /// <inheritdoc cref="IDictionary{TKey,TElement}.Add(TKey,TElement)" />
-        public int Add(in TKey key, IEnumerable<TElement> elements)
+        public int Add(TKey key, IEnumerable<TElement> elements)
         {
             CreateIfNotPresent(key, out int location);
             ref ValueGrouping<TKey, TElement> grouping = ref _entries![location];
-            grouping.AddRange(elements);
-            return location;
+            return grouping.AddRange(elements);
         }
 
         /// <inheritdoc cref="IDictionary{TKey,TElement}.Add(TKey,TElement)" />
-        public void Add(in TKey key, TElement element)
+        public void Add(TKey key, TElement element)
         {
             CreateIfNotPresent(key, out int location);
             _entries![location].Add(element);
+        }
+
+        /// <summary>Creates a grouping with the key, and the elements to the grouping if the grouping does not exists.</summary>
+        /// <param name="key">The key of the grouping.</param>
+        /// <param name="elements">The elements in the collection.</param>
+        /// <returns>If the grouping already exists -1, otherwise; the number of elements added to the created grouping.</returns>
+        public int AddIfNotExists(TKey key, IEnumerable<TElement> elements)
+        {
+            if (CreateIfNotPresent(key, out int location))
+            {
+                ref ValueGrouping<TKey, TElement> grouping = ref _entries![location];
+                return grouping.AddRange(elements);
+            }
+            return -1;
+        }
+
+        /// <summary>Creates a grouping with the key, and the element to the grouping if the grouping does not exists.</summary>
+        /// <param name="key">The key of the grouping.</param>
+        /// <param name="elements">The element to add.</param>
+        /// <returns>If the grouping already exists false, otherwise; true.</returns>
+        public bool AddIfNotExists(TKey key, TElement element)
+        {
+            if (CreateIfNotPresent(key, out int location))
+            {
+                ref ValueGrouping<TKey, TElement> grouping = ref _entries![location];
+                grouping.Add(element);
+                return true;
+            }
+            return false;
         }
 
         /// <inheritdoc />
@@ -242,7 +271,7 @@ namespace KeyValueCollection
             ClearEntry(ref _entries![location]);
             _freeList = location;
             _freeCount++;
-            
+
             return true;
         }
 
@@ -336,6 +365,13 @@ namespace KeyValueCollection
 
 #region ICollection members
 
+        /// <inheritdoc />
+        bool ICollection.IsSynchronized => false;
+
+        /// <inheritdoc />
+        object ICollection.SyncRoot => null!;
+
+        /// <inheritdoc />
         bool ICollection<IGrouping<TKey, TElement>>.IsReadOnly => false;
 
         /// <inheritdoc />
@@ -400,11 +436,17 @@ namespace KeyValueCollection
 
         /// <inheritdoc />
         public override IEnumerator<IGrouping<TKey, TElement>> GetEnumerator() => new Enumerator(this);
-        
+
         /// <inheritdoc />
         IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>> IEnumerable<KeyValuePair<TKey, IEnumerable<TElement>>>.GetEnumerator() => new DictionaryEnumerator(this);
 
         public static IEqualityComparer<GroupingSet<TKey, TElement>> CreateSetComparer() => new GroupingSetEqualityComparer<TKey, TElement>();
+
+        /// <inheritdoc />
+        public void CopyTo(Array array, int index)
+        {
+            CopyTo((IGrouping<TKey, TElement>[])array, index);
+        }
 
 #endregion
 
@@ -872,6 +914,6 @@ namespace KeyValueCollection
             return false;
         }
 
-#endregion
+        #endregion
     }
 }
