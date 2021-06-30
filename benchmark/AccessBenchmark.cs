@@ -21,6 +21,7 @@ namespace KeyValueCollection.Benchmark
     public class AccessBenchmark
     {
         private Person[] _people;
+        private Vector3[][] _metrics;
         
         [Params(100,1000,10000)]
         public int Count;
@@ -30,6 +31,8 @@ namespace KeyValueCollection.Benchmark
 
         public HashSet<IGrouping<Person, Vector3>> HashSet;
 
+        public Dictionary<Person, IEnumerable<Vector3>> EnumerableDictionary;
+
         public GroupingSet<Person, Vector3> GroupingSet;
 
         [GlobalSetup]
@@ -37,23 +40,29 @@ namespace KeyValueCollection.Benchmark
         {
             var people = Generator.GetRandomPeople(Count);
             
-            var rng = new Random(12408782);
+            Random rng = new(12408782);
             Range<float> range = new(-3.14f, 3.14f);
-            var metrics = new Vector3[Count][];
+            _metrics = new Vector3[Count][];
             for (int i = 0; i < Count; i++)
-                metrics[i] = Generator.GetRandomVector3s(VectorFieldSize, range, range, range, rng);
+                _metrics[i] = Generator.GetRandomVector3s(VectorFieldSize, range, range, range, rng);
             
             HashSet = new HashSet<IGrouping<Person, Vector3>>(Count, GroupingComparer.Default);
             for (int i = 0; i < Count; i++)
             {
                 Person p = people[i];
-                HashSet.Add(metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable());
+                HashSet.Add(_metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable());
             }
             
             GroupingSet = new GroupingSet<Person, Vector3>(Count, PersonComparer.Default);
             for (int i = 0; i < Count; i++)
             {
-                GroupingSet.Add(people[i], metrics[i]);
+                GroupingSet.Add(people[i], _metrics[i]);
+            }
+            
+            EnumerableDictionary = new Dictionary<Person, IEnumerable<Vector3>>(Count, PersonComparer.Default);
+            for (int i = 0; i < Count; i++)
+            {
+                EnumerableDictionary.Add(people[i], _metrics[i]);
             }
 
             _people = people.OrderBy(_ => rng.Next()).ToArray();
@@ -63,11 +72,22 @@ namespace KeyValueCollection.Benchmark
         [Benchmark]
         public void HashSet_Access()
         {
-            foreach (Person p in _people)
+            for (var i = 0; i < _people.Length; i++)
             {
-                IGrouping<Person, Vector3> grouping = GetDummyGrouping(p);
+                Person p = _people[i];
+                IGrouping<Person, Vector3> grouping = _metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable();
                 HashSet.TryGetValue(grouping, out grouping);
                 grouping!.Count().Should().Be(VectorFieldSize);
+            }
+        }
+
+        [Benchmark]
+        public void EnumerableDictionary_Access()
+        {
+            foreach (Person p in _people)
+            {
+                IEnumerable<Vector3> vectors = EnumerableDictionary[p];
+                vectors.Count().Should().Be(VectorFieldSize);
             }
         }
 
@@ -76,15 +96,9 @@ namespace KeyValueCollection.Benchmark
         {
             foreach (Person p in _people)
             {
-                ValueGrouping<Person, Vector3> grouping = GroupingSet[p];
+                ref ValueGrouping<Person, Vector3> grouping = ref GroupingSet[p];
                 grouping.Count.Should().Be(VectorFieldSize);
             }
-        }
-
-        private static readonly Vector3[] _vector3s = new[]{ new Vector3() };
-        public IGrouping<Person, Vector3> GetDummyGrouping(Person person)
-        {
-            return _vector3s.GroupBy(_ => person).First();
         }
     }
 }

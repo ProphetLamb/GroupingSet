@@ -30,6 +30,8 @@ namespace KeyValueCollection.Benchmark
 
         public HashSet<IGrouping<Person, Vector3>> HashSet;
 
+        public Dictionary<Person, IEnumerable<Vector3>> EnumerableDictionary;
+
         public GroupingSet<Person, Vector3> GroupingSet;
 
         [GlobalSetup]
@@ -57,6 +59,17 @@ namespace KeyValueCollection.Benchmark
         }
 
         [Benchmark]
+        public void EnumerableDictionary_Create_KnownSize()
+        {
+            EnumerableDictionary = new Dictionary<Person, IEnumerable<Vector3>>(Count, PersonComparer.Default);
+            for (int i = 0; i < Count; i++)
+            {
+                EnumerableDictionary.Add(_people[i], _metrics[i]);
+            }
+            EnumerableDictionary.Count.Should().Be(Count);
+        }
+
+        [Benchmark]
         public void GroupingSet_Create_KnownSize()
         {
             GroupingSet = new GroupingSet<Person, Vector3>(Count, PersonComparer.Default);
@@ -77,6 +90,17 @@ namespace KeyValueCollection.Benchmark
                 HashSet.Add(_metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable());
             }
             HashSet.Count.Should().Be(Count);
+        }
+
+        [Benchmark]
+        public void EnumerableDictionary_Create_UnknownSize()
+        {
+            EnumerableDictionary = new Dictionary<Person, IEnumerable<Vector3>>(PersonComparer.Default);
+            for (int i = 0; i < Count; i++)
+            {
+                EnumerableDictionary.Add(_people[i], _metrics[i]);
+            }
+            EnumerableDictionary.Count.Should().Be(Count);
         }
 
         [Benchmark]
