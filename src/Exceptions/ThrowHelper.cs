@@ -60,11 +60,6 @@ namespace KeyValueCollection.Exceptions
             throw new IndexOutOfRangeException();
         }
 
-        public static NotSupportedException GetNotSupportedException()
-        {
-            return new ();
-        }
-
         public static string GetArgumentName(ExceptionArgument argument)
         {
             if (s_argumentNameMap.TryGetValue(argument, out string? name))
