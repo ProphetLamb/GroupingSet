@@ -199,16 +199,14 @@ namespace KeyValueCollection
 
         /// <inheritdoc cref="IDictionary{TKey,TValue}.TryGetValue" />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool TryGetValue(in TKey key, [NotNullWhen(true)] out ValueGrouping<TKey, TElement>? value)
+        public bool TryGetRef(in TKey key, [NotNullWhen(true)] ref ValueGrouping<TKey, TElement> value)
         {
             int location = FindItemIndex(key, out _);
             if (location >= 0)
             {
-                value = _entries![location];
+                value = ref _entries![location];
                 return true;
             }
-
-            value = null;
             return false;
         }
 
