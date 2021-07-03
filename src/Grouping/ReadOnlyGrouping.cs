@@ -15,6 +15,7 @@ namespace KeyValueCollection.Grouping
     public sealed class ReadOnlyGrouping<TKey, TElement> :
         IGrouping<TKey, TElement>,
         ICollection<TElement>,
+        ICollection,
         IReadOnlyList<TElement>,
         IEquatable<ReadOnlyGrouping<TKey, TElement>>,
         IEquatable<IGrouping<TKey, TElement>>
@@ -48,6 +49,12 @@ namespace KeyValueCollection.Grouping
 
         /// <inheritdoc cref="ICollection{T}.Count" />
         public int Count => _endIndex - _startIndex;
+
+        /// <inheritdoc />
+        public bool IsSynchronized => true;
+        
+        /// <inheritdoc />
+        public object SyncRoot => _elements!;
 
         /// <inheritdoc />
         public bool IsReadOnly => true;
@@ -98,6 +105,9 @@ namespace KeyValueCollection.Grouping
 
         /// <inheritdoc />
         public void CopyTo(TElement[] array, int arrayIndex) => _elements?.CopyTo(array, arrayIndex);
+
+        /// <inheritdoc />
+        void ICollection.CopyTo(Array array, int index) => CopyTo((TElement[]) array, index);
 
         /// <summary>Not supported.</summary>
         /// <returns>Not supported.</returns>
