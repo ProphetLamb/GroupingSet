@@ -13,7 +13,9 @@ os: Visual Studio 2019
 init:
   - ps: $Env:LABEL = "CI" + $Env:APPVEYOR_BUILD_NUMBER.PadLeft(5, "0")
 
-platform: Any CPU
+platform:
+  - x64
+  - x86
 
 configuration:
   - Debug
