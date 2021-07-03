@@ -21,6 +21,7 @@ namespace KeyValueCollection.Tests
             return dic;
         }
 
+        [Test]
         public void TestIndexer()
         {
             ILookup<Person, Vector3> dic = GenerateSampleData();
@@ -28,9 +29,10 @@ namespace KeyValueCollection.Tests
                 dic[SampleData.People[i]].Should().BeEquivalentTo(SampleData.Metrics[i]);
 
             Assert.Throws<KeyNotFoundException>(() => _ = dic[new Person()]);
-            Assert.Throws<ArgumentNullException>(() => _ = dic[null]);
+            Assert.Throws<NullReferenceException>(() => _ = dic[null]);
         }
 
+        [Test]
         public void TestContains()
         {
             ILookup<Person, Vector3> dic = GenerateSampleData();
@@ -39,7 +41,7 @@ namespace KeyValueCollection.Tests
                 dic.Contains(p).Should().BeTrue();
 
             dic.Contains(new Person()).Should().BeFalse();
-            Assert.Throws<ArgumentNullException>(() => dic.Contains(null));
+            Assert.Throws<NullReferenceException>(() => dic.Contains(null));
         }
     }
 }

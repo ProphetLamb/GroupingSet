@@ -1,11 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
+using System.Reflection;
+using System.Runtime.Serialization;
+using System.Security.Cryptography;
+
 using FluentAssertions;
 using GenericRange;
 using KeyValueCollection.Extensions;
 using KeyValueCollection.Tests.Utility;
 using NUnit.Framework;
+
+using BindingFlags = System.Reflection.BindingFlags;
 
 namespace KeyValueCollection.Tests
 {
@@ -51,13 +58,13 @@ namespace KeyValueCollection.Tests
         public void TestCtorEnumerable()
         {
             Person[] people = Generator.GetRandomPeople(100);
-            IEnumerable<string>[] names = people.Select(p => new[] { p.FirstName + p.LastName, p.FirstName, p.LastName }.AsEnumerable()).ToArray();
+            IEnumerable<string>[] names = people.Select(p => new[] { p.LastName }.AsEnumerable()).ToArray();
 
             Dictionary<Person, string> dic = people.ToDictionary(pair => pair, pair => pair.LastName);
             GroupingSet<Person, string> set = new(dic);
             GroupingSet<Person, string> other = dic.GroupBy(pair => pair.Key, pair => pair.Value).ToSet();
             set.ShouldHaveKeysAndValues(people, names);
-            other.ShouldHaveKeysAndValues(people,names);
+            other.ShouldHaveKeysAndValues(people, names);
         }
         [Test]
         public void TestCtorComparer()
@@ -98,7 +105,7 @@ namespace KeyValueCollection.Tests
         public void TestCtorEnumerableComparer()
         {
             Person[] people = Generator.GetRandomPeople(100);
-            IEnumerable<string>[] names = people.Select(p => new[] { p.FirstName + p.LastName, p.FirstName, p.LastName }.AsEnumerable()).ToArray();
+            IEnumerable<string>[] names = people.Select(p => new[] { p.LastName }.AsEnumerable()).ToArray();
 
             Dictionary<Person, string> dic = people.ToDictionary(pair => pair, pair => pair.LastName);
             GroupingSet<Person, string> set = new(dic, PersonComparer.Default);
@@ -153,13 +160,29 @@ namespace KeyValueCollection.Tests
         }
 
         [Test]
-        public void TestSerialize()
+        public void TestAddRemove()
         {
-            Person[] people = Generator.GetRandomPeople(100);
-            IEnumerable<string>[] names = people.Select(p => new[] { p.FirstName + p.LastName, p.FirstName, p.LastName }.AsEnumerable()).ToArray();
+            Random rng = new();
+            (Person[] people, Vector3[][] metrics) = Generator.GenerateSampleData(100, 40, rng);
 
-            GroupingSet<Person, string> set = people.ToDictionary(pair => pair, pair => pair.LastName).ToSet();
+            List<Person> keyShadowList = new();
+            GroupingSet<Person, Vector3[]> set = new(PersonComparer.Default);
+            
+            for (int i = 0; i < 100; i++)
+            {
+                if (rng.Next(Int32.MinValue, Int32.MaxValue) < 0)
+                {
+                    set.Remove(people[i]);
+                    keyShadowList.Remove(people[i]);
+                }
+                else
+                {
+                    set.Add(people[i], metrics[i]);
+                    keyShadowList.Add(people[i]);
+                }
+            }
 
+            set.Keys.Should().BeEquivalentTo(keyShadowList);
         }
     }
 }

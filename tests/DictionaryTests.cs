@@ -24,19 +24,22 @@ namespace KeyValueCollection.Tests
                 dic.Add(SampleData.People[i], SampleData.Metrics[i]);
             return dic;
         }
-
+        
+        [Test]
         public void TestAdd()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = new GroupingSet<Person, Vector3>();
             dic.Add(SampleData.People[0], SampleData.Metrics[0]);
 
             dic.Keys.Should().BeEquivalentTo(SampleData.People[0]);
-            dic.Values.Should().BeEquivalentTo(SampleData.Metrics[0]);
+            dic.Values.Should().BeEquivalentTo(SampleData.Metrics.Take(1));
             dic.Count.Should().Be(1);
-            dic.GetEnumerator().MoveNext().Should().BeTrue();
-            dic.GetEnumerator().MoveNext().Should().BeFalse();
+            var en = dic.GetEnumerator();
+            en.MoveNext().Should().BeTrue();
+            en.MoveNext().Should().BeFalse();
         }
 
+        [Test]
         public void TestClear()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -49,16 +52,18 @@ namespace KeyValueCollection.Tests
             dic.GetEnumerator().MoveNext().Should().BeFalse();
         }
 
+        [Test]
         public void TestContainsKey()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
 
             dic.ContainsKey(new Person()).Should().BeFalse();
-            Assert.Throws<ArgumentNullException>(() => dic.ContainsKey(null));
+            Assert.Throws<NullReferenceException>(() => dic.ContainsKey(null));
             foreach(Person p in SampleData.People)
                 dic.ContainsKey(p).Should().BeTrue();
         }
 
+        [Test]
         public void TestTryGetValue()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -69,9 +74,10 @@ namespace KeyValueCollection.Tests
                 metrics.Should().BeEquivalentTo(SampleData.Metrics[i]);
             }
             dic.TryGetValue(new Person(), out _).Should().BeFalse();
-            Assert.Throws<ArgumentNullException>(() => dic.TryGetValue(null, out _));
+            Assert.Throws<NullReferenceException>(() => dic.TryGetValue(null, out _));
         }
 
+        [Test]
         public void TestIndexer()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -81,18 +87,20 @@ namespace KeyValueCollection.Tests
                 dic[SampleData.People[i]].Should().BeEquivalentTo(SampleData.Metrics[i]);
             }
             Assert.Throws<KeyNotFoundException>(() => _ = dic[new Person()]);
-            Assert.Throws<ArgumentNullException>(() => dic.TryGetValue(null, out _));
+            Assert.Throws<NullReferenceException>(() => dic.TryGetValue(null, out _));
         }
 
+        [Test]
         public void TestCopyTo()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
-            var array = new KeyValuePair<Person, IEnumerable<Vector3>>[dic.Count];
+            var array = new KeyValuePair<Person, IEnumerable<Vector3>>[10];
             dic.CopyTo(array, 0);
-            for(int i = 0; i < array.Length; i++)
+            for(int i = 0; i < 10; i++)
                 array[i].Should().NotBeNull();
         }
 
+        [Test]
         public void TestKeyCollection_Enumerator()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -100,13 +108,14 @@ namespace KeyValueCollection.Tests
             keys.ToArray().Should().BeEquivalentTo(SampleData.People);
         }
 
+        [Test]
         public void TestKeyCollection_Remove()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
             ICollection<Person> keys = dic.Keys;
 
             keys.Remove(new Person()).Should().BeFalse();
-            Assert.Throws<ArgumentNullException>(() => keys.Remove(null));
+            Assert.Throws<NullReferenceException>(() => keys.Remove(null));
             foreach(Person p in SampleData.People)
                 keys.Remove(p).Should().BeTrue();
 
@@ -114,17 +123,19 @@ namespace KeyValueCollection.Tests
             keys.Should().BeEmpty();
         }
 
+        [Test]
         public void TestKeyCollection_Contains()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
             ICollection<Person> keys = dic.Keys;
 
             keys.Contains(new Person()).Should().BeFalse();
-            Assert.Throws<ArgumentNullException>(() => keys.Contains(null));
+            Assert.Throws<NullReferenceException>(() => keys.Contains(null));
             foreach(Person p in SampleData.People)
                 keys.Contains(p).Should().BeTrue();
         }
 
+        [Test]
         public void TestKeyCollection_Clear()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -141,6 +152,7 @@ namespace KeyValueCollection.Tests
             keys.Should().BeEmpty();
         }
 
+        [Test]
         public void TestKeyCollection_CopyTo()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -150,6 +162,7 @@ namespace KeyValueCollection.Tests
                 array[i].Should().NotBeNull();
         }
 
+        [Test]
         public void TestValueCollection_Enumerator()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -157,6 +170,7 @@ namespace KeyValueCollection.Tests
             values.ToArray().Should().BeEquivalentTo(SampleData.Metrics);
         }
 
+        [Test]
         public void TestValueCollection_Remove()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -164,6 +178,7 @@ namespace KeyValueCollection.Tests
             Assert.Throws<NotSupportedException>(() => values.Remove(Enumerable.Empty<Vector3>()));
         }
 
+        [Test]
         public void TestValueCollection_Contains()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -171,6 +186,7 @@ namespace KeyValueCollection.Tests
             Assert.Throws<NotSupportedException>(() => values.Contains(Enumerable.Empty<Vector3>()));
         }
 
+        [Test]
         public void TestValueCollection_Clear()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
@@ -187,6 +203,7 @@ namespace KeyValueCollection.Tests
             keys.Should().BeEmpty();
         }
 
+        [Test]
         public void TestValueCollection_CopyTo()
         {
             IDictionary<Person, IEnumerable<Vector3>> dic = GenerateSampleData();
