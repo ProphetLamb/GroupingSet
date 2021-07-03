@@ -33,7 +33,7 @@ namespace KeyValueCollection.Exceptions
         }
 
         [DoesNotReturn]
-        public static void ThrowArgumentException_ArrayCapacity(ExceptionArgument argument)
+        public static void ThrowArgumentException_InsufficentArrayCapacity(ExceptionArgument argument)
         {
             throw new ArgumentException("Array has insufficient capacity.", GetArgumentName(argument));
         }
@@ -71,6 +71,9 @@ namespace KeyValueCollection.Exceptions
     }
 
     public enum ExceptionArgument {
-        array, capacity, other, arrayIndex, count
+        array, capacity, other, arrayIndex, count,
+        item,
+        source,
+        value
     }
 }
