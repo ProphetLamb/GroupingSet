@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Jobs;
 
 using FluentAssertions;
@@ -14,6 +15,10 @@ using KeyValueCollection.Tests.Utility;
 
 namespace KeyValueCollection.Benchmark
 {
+    [MemoryDiagnoser]
+    [HardwareCounters(
+        HardwareCounter.BranchMispredictions,
+        HardwareCounter.BranchInstructions)]
     [SimpleJob(RuntimeMoniker.Net50)]
     public class InitBenchmark : BenchmarkBase
     {
@@ -27,7 +32,19 @@ namespace KeyValueCollection.Benchmark
         public void Setup()
         {
             Random rng = new(12408782);
-            (People, Metrics) = GenerateSampleData(Count, VectorFieldSize, rng);
+            (People, Metrics) = Generator.GenerateSampleData(Count, VectorFieldSize, rng);
+        }
+
+        [GlobalCleanup]
+        public void Cleanup()
+        {
+            CleanupSampleData();
+        }
+
+        [IterationCleanup]
+        public void CleanupIteration()
+        {
+            CleanupGeneratedSets();
         }
 
         [Benchmark]
@@ -37,9 +54,10 @@ namespace KeyValueCollection.Benchmark
             for (int i = 0; i < Count; i++)
             {
                 Person p = People[i];
-                HashSet.Add(Metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable());
+                HashSet.Add(Metrics[i].GroupBy(_ => p, PersonComparer.Default).First());
             }
             HashSet.Count.Should().Be(Count);
+            HashSet = null;
         }
 
         [Benchmark]
@@ -51,6 +69,7 @@ namespace KeyValueCollection.Benchmark
                 ListDictionary.Add(People[i], Metrics[i].ToList());
             }
             ListDictionary.Count.Should().Be(Count);
+            ListDictionary = null;
         }
 
         [Benchmark]
@@ -62,6 +81,7 @@ namespace KeyValueCollection.Benchmark
                 GroupingSet.Add(People[i], Metrics[i]);
             }
             GroupingSet.Count.Should().Be(Count);
+            GroupingSet = null;
         }
 
         [Benchmark]
@@ -71,9 +91,10 @@ namespace KeyValueCollection.Benchmark
             for (int i = 0; i < Count; i++)
             {
                 Person p = People[i];
-                HashSet.Add(Metrics[i].GroupBy(_ => p, PersonComparer.Default).First().ToImmutable());
+                HashSet.Add(Metrics[i].GroupBy(_ => p, PersonComparer.Default).First());
             }
             HashSet.Count.Should().Be(Count);
+            HashSet = null;
         }
 
         [Benchmark]
@@ -85,6 +106,7 @@ namespace KeyValueCollection.Benchmark
                 ListDictionary.Add(People[i], Metrics[i].ToList());
             }
             ListDictionary.Count.Should().Be(Count);
+            ListDictionary = null;
         }
 
         [Benchmark]
@@ -96,6 +118,7 @@ namespace KeyValueCollection.Benchmark
                 GroupingSet.Add(People[i], Metrics[i]);
             }
             GroupingSet.Count.Should().Be(Count);
+            GroupingSet = null;
         }
     }
 }

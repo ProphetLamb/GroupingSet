@@ -2,14 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Jobs;
 using KeyValueCollection.Grouping;
 using KeyValueCollection.Tests;
+using KeyValueCollection.Tests.Utility;
 
 namespace KeyValueCollection.Benchmark
 {
+    [MemoryDiagnoser]
+    [HardwareCounters(
+        HardwareCounter.BranchMispredictions,
+        HardwareCounter.BranchInstructions)]
     [SimpleJob(RuntimeMoniker.Net50)]
     public class MutateBenchmark : BenchmarkBase
     {
@@ -19,19 +24,24 @@ namespace KeyValueCollection.Benchmark
         [Params(10, 100)]
         public int Count;
 
-        [Params(10, 100)]
+        [Params(10)]
         public int VectorFieldSize;
-
+        
         [GlobalSetup]
         public void Setup()
         {
             Random rng = new(12408782);
+            (People, Metrics) = Generator.GenerateSampleData(1000, 1, rng);
+            (HashSet, ListDictionary, GroupingSet) = GenerateSetsFromData(1000);
 
-            int initCount = 1000, initVecFieldSize = 1;
-            (People, Metrics) = GenerateSampleData(initCount, initVecFieldSize, rng);
-            (HashSet, ListDictionary, GroupingSet) = GenerateSetsFromData(initCount, initVecFieldSize);
+            (MutPeople, MutMetrics) = Generator.GenerateSampleData(Count, VectorFieldSize, rng);
+        }
 
-            (MutPeople, MutMetrics) = GenerateSampleData(Count, VectorFieldSize, rng);
+        [GlobalCleanup]
+        public void Cleanup()
+        {
+            CleanupSampleData();
+            CleanupGeneratedSets();
         }
 
 #if BENCH_HASHSET
@@ -129,7 +139,7 @@ namespace KeyValueCollection.Benchmark
                 Person p = MutPeople[i];
                 if (GroupingSet.ContainsKey(p))
                 {
-                    ref var grouping = ref GroupingSet[p];
+                    Grouping<Person, Vector3> grouping = GroupingSet[p];
                     foreach(Vector3 vec in MutMetrics[i])
                         grouping.Remove(vec);
                     if (grouping.Count == 0)
@@ -144,8 +154,7 @@ namespace KeyValueCollection.Benchmark
             for (int i = 0; i < Count; i++)
             {
                 Person p = MutPeople[i];
-                ref ValueGrouping<Person, Vector3> grouping = ref Unsafe.NullRef<ValueGrouping<Person, Vector3>>();
-                if (GroupingSet.TryGetRef(p, ref grouping))
+                if (GroupingSet.TryGetValue(p, out Grouping<Person, Vector3> grouping))
                 {
                     foreach(Vector3 vec in MutMetrics[i])
                         grouping.Remove(vec);

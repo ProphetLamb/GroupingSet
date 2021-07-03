@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
+
 using GenericRange;
 using KeyValueCollection.Extensions;
 using KeyValueCollection.Tests;
@@ -20,7 +22,7 @@ namespace KeyValueCollection.Benchmark
 
         public GroupingSet<Person, Vector3> GroupingSet;
 
-        public virtual (HashSet<IGrouping<Person, Vector3>> HashSet, Dictionary<Person, IList<Vector3>> Dictionary, GroupingSet<Person, Vector3> GroupingSet) GenerateSetsFromData(int count, int vectorFieldSize)
+        public (HashSet<IGrouping<Person, Vector3>> HashSet, Dictionary<Person, IList<Vector3>> Dictionary, GroupingSet<Person, Vector3> GroupingSet) GenerateSetsFromData(int count)
         {
             HashSet<IGrouping<Person, Vector3>> hashSet = new(count, GroupingComparer.Default);
 #if BENCH_HASHSET
@@ -44,6 +46,34 @@ namespace KeyValueCollection.Benchmark
             }
 
             return (hashSet, listDictionary, groupingSet);
+        }
+
+        public void CleanupGeneratedSets()
+        {
+            WeakReference hashset = new(HashSet);
+            WeakReference dictionary = new(ListDictionary);
+            WeakReference set = new(GroupingSet);
+            HashSet = null;
+            ListDictionary = null;
+            GroupingSet = null;
+            while (hashset.IsAlive || dictionary.IsAlive || set.IsAlive)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+        
+        public void CleanupSampleData()
+        {
+            WeakReference people = new(People);
+            WeakReference metrics = new(Metrics);
+            People = null;
+            Metrics = null;
+            while (people.IsAlive || metrics.IsAlive)
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
         }
     }
 }

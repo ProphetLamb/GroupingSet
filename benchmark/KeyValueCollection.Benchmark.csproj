@@ -6,6 +6,7 @@
     </PropertyGroup>
     <ItemGroup>
       <PackageReference Include="BenchmarkDotNet" Version="0.13.0" />
+      <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.0" />
       <PackageReference Include="Bogus" Version="33.0.2" />
       <PackageReference Include="FluentAssertions" Version="5.10.3" />
       <PackageReference Include="GenericRange" Version="0.1.0" />

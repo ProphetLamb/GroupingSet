@@ -4,15 +4,20 @@ using System.Linq;
 using System.Numerics;
 
 using BenchmarkDotNet.Attributes;
+using BenchmarkDotNet.Diagnosers;
 using BenchmarkDotNet.Jobs;
 
 using FluentAssertions;
 
-using KeyValueCollection.Grouping;
 using KeyValueCollection.Tests;
+using KeyValueCollection.Tests.Utility;
 
 namespace KeyValueCollection.Benchmark
 {
+    [MemoryDiagnoser]
+    [HardwareCounters(
+        HardwareCounter.BranchMispredictions,
+        HardwareCounter.BranchInstructions)]
     [SimpleJob(RuntimeMoniker.Net50)]
     public class AccessBenchmark : BenchmarkBase
     {
@@ -21,14 +26,21 @@ namespace KeyValueCollection.Benchmark
 
         [Params(10,100)]
         public int VectorFieldSize;
-
+        
         [GlobalSetup]
         public void Setup()
         {
             Random rng = new(12408782);
-            (People, Metrics) = GenerateSampleData(Count, VectorFieldSize, rng);
-            (HashSet, ListDictionary, GroupingSet) = GenerateSetsFromData(Count, VectorFieldSize);
+            (People, Metrics) = Generator.GenerateSampleData(Count, VectorFieldSize, rng);
+            (HashSet, ListDictionary, GroupingSet) = GenerateSetsFromData(Count);
             People = People.OrderBy(_ => rng.Next()).ToArray();
+        }
+
+        [GlobalCleanup]
+        public void Cleanup()
+        {
+            CleanupSampleData();
+            CleanupGeneratedSets();
         }
 
 #if BENCH_HASHSET
@@ -60,8 +72,7 @@ namespace KeyValueCollection.Benchmark
         {
             foreach (Person p in People)
             {
-                ref ValueGrouping<Person, Vector3> grouping = ref GroupingSet[p];
-                grouping.Count.Should().Be(VectorFieldSize);
+                GroupingSet[p].Count.Should().Be(VectorFieldSize);
             }
         }
     }
