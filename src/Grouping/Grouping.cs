@@ -7,15 +7,17 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 
 using KeyValueCollection.DebugViews;
+using KeyValueCollection.Exceptions;
 using KeyValueCollection.Utility;
 
 namespace KeyValueCollection.Grouping
 {
     [DebuggerDisplay("Key: {Key}, Count: {Count}")]
     [DebuggerTypeProxy(typeof(IGroupingDebugView<,>))]
-    public struct ValueGrouping<TKey, TElement> :
+    public sealed class Grouping<TKey, TElement> :
         IGrouping<TKey, TElement>,
         IList<TElement>,
+        ICollection,
         IReadOnlyList<TElement>
         where TKey : notnull
     {
@@ -23,12 +25,6 @@ namespace KeyValueCollection.Grouping
 
         internal TKey KeyValue;
         internal int HashCode;
-        /// <summary>
-        /// 0-based index of next entry in chain: -1 means end of chain
-        /// also encodes whether this entry _itself_ is part of the free list by changing sign and subtracting 3,
-        /// so -2 means end of free list, -3 means index 0 but on free list, -4 means index 1 but on free list, etc.
-        /// </summary>
-        internal int Next;
         internal TElement[]? Elements;
         private int _count;
         
@@ -36,32 +32,30 @@ namespace KeyValueCollection.Grouping
 
 #region Ctors
 
-        internal ValueGrouping(TKey key, int hashCode)
+        internal Grouping(TKey key, int hashCode)
         {
             KeyValue = key;
             HashCode = hashCode;
-            Next = 0;
             Elements = null;
             _count = 0;
         }
 
-        internal ValueGrouping(TKey key, int hashCode, IEnumerable<TElement> elements)
+        internal Grouping(TKey key, int hashCode, IEnumerable<TElement> elements)
             : this(key, hashCode)
         {
             AddRange(elements);
         }
 
-        internal ValueGrouping(TKey key, int hashCode, ReadOnlySpan<TElement> elements)
+        internal Grouping(TKey key, int hashCode, ReadOnlySpan<TElement> elements)
             : this(key, hashCode)
-            {
-                    AddRange(elements);
+        {
+            AddRange(elements);
         }
 
-        internal ValueGrouping(ValueGrouping<TKey, TElement> source)
+        internal Grouping(Grouping<TKey, TElement> source)
         {
             KeyValue = source.Key;
             HashCode = source.HashCode;
-            Next = 0;
             Elements = Array.Empty<TElement>();
             _count = 0;
             
@@ -73,12 +67,20 @@ namespace KeyValueCollection.Grouping
 
 #region Properties
         
+        /// <inheritdoc />
         public TKey Key => KeyValue;
 
+        /// <inheritdoc cref="ICollection{T}.Count" />
         public int Count => _count;
 
         /// <inheritdoc />
         bool ICollection<TElement>.IsReadOnly => false;
+        
+        /// <inheritdoc />
+        bool ICollection.IsSynchronized => false;
+        
+        /// <inheritdoc />
+        object ICollection.SyncRoot => null!;
 
         /// <inheritdoc cref="IList{T}.this" />
         public TElement this[int index]
@@ -106,10 +108,16 @@ namespace KeyValueCollection.Grouping
         /// <inheritdoc />
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(TElement item) => IndexOf(item, EqualityComparer<TElement>.Default);
-
+        
+        /// <summary>Determines the index of the first occurence of a specific item in the <see cref="IList{T}"/>.</summary>
+        /// <param name="item">The object to locate.</param>
+        /// <param name="comparer">The comparer used to locate the item.</param>
+        /// <returns>The zero-based index of item if found in the list; otherwise, -1.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int IndexOf(TElement item, IEqualityComparer<TElement> comparer)
         {
+            if (item == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.item);
             if (Elements != null)
             {
                 for (int i = 0; i < Elements.Length; i++)
@@ -124,10 +132,19 @@ namespace KeyValueCollection.Grouping
             return -1;
         }
 
+        /// <summary>Determines the index of the last occurence of a specific item in the <see cref="IList{T}"/>.</summary>
+        /// <param name="item">The object to locate.</param>
+        /// <returns>The zero-based index of item if found in the list; otherwise, -1.</returns>
         public int IndexOfLast(TElement item) => IndexOfLast(item, EqualityComparer<TElement>.Default);
         
+        /// <summary>Determines the index of the last occurence of a specific item in the <see cref="IList{T}"/>.</summary>
+        /// <param name="item">The object to locate.</param>
+        /// <param name="comparer">The comparer used to locate the item.</param>
+        /// <returns>The zero-based index of item if found in the list; otherwise, -1.</returns>
         public int IndexOfLast(TElement item, IEqualityComparer<TElement> comparer)
         {
+            if (item == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.item);
             if (Elements != null)
             {
                 for (int i = Elements.Length - 1; i >= 0; i--)
@@ -146,9 +163,17 @@ namespace KeyValueCollection.Grouping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TElement item) => Contains(item, EqualityComparer<TElement>.Default);
         
+        /// <summary>Determines whether the <see cref="IList{T}"/> contains a specific value.</summary>
+        /// <param name="item">The object to locate.</param>
+        /// <param name="comparer">The comparer used to locate the item.</param>
+        /// <returns><see langword="true"/> if item is found in the <see cref="IList{T}"/>; otherwise, <see langword="false"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(TElement item, IEqualityComparer<TElement> comparer) => IndexOf(item, comparer) >= 0;
-
+        
+        /// <summary>Determines whether the <see cref="IList{T}"/> contains all <paramref name="items"/>.</summary>
+        /// <param name="items">The items.</param>
+        /// <param name="comparer">The comparer used to determine whether an object is equal to another.</param>
+        /// <returns><see langword="true"/> if items are found in the <see cref="IList{T}"/>; otherwise, <see langword="false"/>.</returns>
         public bool ContainsAll(IEnumerable<TElement> items, IEqualityComparer<TElement> comparer)
         {
             if (Elements != null)
@@ -170,12 +195,17 @@ namespace KeyValueCollection.Grouping
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Add(TElement item)
         {
+            if (item == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.item);
             if (Elements == null || _count >= Elements.Length - 1)
                 Grow(1);
             Elements![_count] = item;
             _count++;
         }
-
+        
+        /// <summary>Adds a sequence of elements to the <see cref="Grouping{TKey,TElement}"/>.</summary>
+        /// <param name="items">The sequence of objects to add.</param>
+        /// <returns>The number of elements added.</returns>
         public int AddRange(IEnumerable<TElement> items)
         {
             int count = _count;
@@ -196,15 +226,16 @@ namespace KeyValueCollection.Grouping
                     goto default;
                 default:
                     added = 0;
-            foreach (TElement element in items)
-            {
-                Add(element);
-                added++;
-            }
+                    foreach (TElement element in items)
+                        Elements![_count + added++] = element;
+                    _count += added;
                     return added;
             }
         }
-
+        
+        /// <summary>Adds a sequence of elements to the <see cref="Grouping{TKey,TElement}"/>.</summary>
+        /// <param name="span">The span of objects to add.</param>
+        /// <returns>The number of elements added.</returns>
         public int AddRange(ReadOnlySpan<TElement> span)
         {
             int added = span.Length;
@@ -220,8 +251,11 @@ namespace KeyValueCollection.Grouping
             return added;
         }
 
+        /// <inheritdoc />
         public void Insert(int index, TElement item)
         {
+            if (item == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.item);
             if (Elements == null || _count > Elements.Length - 1)
                 Grow(1);
             int remaining = _count - index;
@@ -229,7 +263,11 @@ namespace KeyValueCollection.Grouping
             Elements![index] = item;
             _count++;
         }
-        
+
+        /// <summary>Inserts an item to the <see cref="IList{T}"/> at the specified index.</summary>
+        /// <param name="index">The zero-based index at which item should be inserted.</param>
+        /// <param name="items">The objects to insert into the <see cref="IList{T}"/>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">index is not a valid index in the <see cref="IList{T}"/>.</exception>
         public void Insert(int index, ReadOnlySpan<TElement> items)
         {
             if (Elements == null || _count > Elements.Length - items.Length)
@@ -246,6 +284,8 @@ namespace KeyValueCollection.Grouping
         /// <inheritdoc cref="ICollection{T}.Remove(T)" />
         public bool Remove(TElement item, IEqualityComparer<TElement> comparer)
         {
+            if (item == null)
+                ThrowHelper.ThrowArgumentNullException(ExceptionArgument.item);
             int index = IndexOf(item, comparer);
             if (index >= 0)
             {
@@ -278,6 +318,7 @@ namespace KeyValueCollection.Grouping
             return removed;
         }
 
+        /// <inheritdoc />
         public void RemoveAt(int index)
         {
             int count = _count;
@@ -297,6 +338,7 @@ namespace KeyValueCollection.Grouping
             ArrayPool<TElement>.Shared.Return(tempPool);
         }
         
+        /// <inheritdoc />
         public void CopyTo(TElement[] array, int arrayIndex)
         {
             if (Elements != null)
@@ -304,10 +346,13 @@ namespace KeyValueCollection.Grouping
         }
 
         /// <inheritdoc />
+        void ICollection.CopyTo(Array array, int index) => CopyTo((TElement[]) array, index);
+
+        /// <inheritdoc />
         public IEnumerator<TElement> GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
 
         /// <inheritdoc />
-        IEnumerator IEnumerable.GetEnumerator() => new ArraySegmentEnumerator<TElement>(Elements, 0, _count);
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
         public int Resize()
         {
@@ -326,10 +371,21 @@ namespace KeyValueCollection.Grouping
 
             return size;
         }
+        
+        /// <summary>
+        /// Constructs a new <see cref="Grouping{TKey,TElement}"/> from an existing, by creating a shallow copy of the elements of the <paramref name="grouping"/>.
+        /// </summary>
+        /// <param name="grouping">The grouping copy.</param>
+        /// <returns>The equivalent grouping.</returns>
+        public static Grouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping) => new(grouping.Key, grouping.Key.GetHashCode(), grouping);
 
-        public static ValueGrouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping) => new(grouping.Key, grouping.Key.GetHashCode(), grouping);
-
-        public static ValueGrouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping, IEqualityComparer<TKey> hashCreator) => new(grouping.Key, hashCreator.GetHashCode(grouping.Key), grouping);
+        /// <summary>
+        /// Constructs a new <see cref="Grouping{TKey,TElement}"/> from an existing, by creating a shallow copy of the elements of the <paramref name="grouping"/>.
+        /// </summary>
+        /// <param name="grouping">The grouping copy.</param>
+        /// <param name="hashCreator">The comparer used to determine the hashcode of the key.</param> 
+        /// <returns>The equivalent grouping.</returns>
+        public static Grouping<TKey, TElement> From(IGrouping<TKey, TElement> grouping, IEqualityComparer<TKey> hashCreator) => new(grouping.Key, hashCreator.GetHashCode(grouping.Key), grouping);
 
 #endregion
 
@@ -360,8 +416,6 @@ namespace KeyValueCollection.Grouping
                 Elements = new TElement[Math.Max(additionalCapacityBeyondCount, 4)];
             }
         }
-
-        internal ArraySegment<TElement> GetSegment() => Elements != null ? new(Elements, 0, _count) : ArraySegment<TElement>.Empty;
 
 #endregion
     }

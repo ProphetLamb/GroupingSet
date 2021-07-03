@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 using KeyValueCollection.Grouping;
@@ -16,12 +17,12 @@ namespace KeyValueCollection.DebugViews
         }
 
         [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]
-        public ValueGrouping<TKey, TElement>[] Items
+        public Grouping<TKey, TElement>[] Items
         {
             get
             {
-                var col = new ValueGrouping<TKey, TElement>[_set.Count];
-                _set.CopyTo(col, 0);
+                var col = new Grouping<TKey, TElement>[_set.Count];
+                _set.CopyTo(col.AsSpan());
                 return col;
             }
         }
