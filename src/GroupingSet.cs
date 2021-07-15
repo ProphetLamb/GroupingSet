@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
@@ -58,9 +59,7 @@ namespace KeyValueCollection
         private int _count;
         private int[]? _buckets;
         private Entry[]? _entries;
-#if TARGET_64BIT
         private ulong _fastModMultiplier;
-#endif
         private int _freeList;
         private int _freeCount;
         private int _version;
@@ -428,6 +427,7 @@ namespace KeyValueCollection
         }
 
         /// <inheritdoc cref="ICollection{T}.Contains" />
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Contains(IGrouping<TKey, TElement> elements) => GroupingContainsElements(elements.Key, elements);
 
@@ -435,6 +435,7 @@ namespace KeyValueCollection
         {
             if (arrayIndex < 0)
                 ThrowHelper.ThrowArgumentOutOfRangeException_ValueGreaterOrEqualZero(ExceptionArgument.arrayIndex, arrayIndex);
+
             if (count < 0)
                 ThrowHelper.ThrowArgumentOutOfRangeException_ValueGreaterOrEqualZero(ExceptionArgument.count, count);
             if (count > array.Length - arrayIndex)
@@ -448,18 +449,19 @@ namespace KeyValueCollection
         }
 
         /// <inheritdoc />
-        void ICollection.CopyTo(Array array, int index)
-        {
-            CopyTo((IGrouping<TKey, TElement>[])array, index, array.Length);
-        }
-
-        /// <inheritdoc />
+        [Pure]
         public IEnumerator<IGrouping<TKey, TElement>> GetEnumerator() => new Enumerator(this);
 
         /// <inheritdoc />
         IEnumerator<KeyValuePair<TKey, IEnumerable<TElement>>> IEnumerable<KeyValuePair<TKey, IEnumerable<TElement>>>.GetEnumerator() => new DictionaryEnumerator(this);
 
         public static IEqualityComparer<GroupingSet<TKey, TElement>> CreateSetComparer() => new GroupingSetEqualityComparer<TKey, TElement>();
+
+        /// <inheritdoc />
+        void ICollection.CopyTo(Array array, int index)
+        {
+            CopyTo((IGrouping<TKey, TElement>[])array, index);
+        }
 
 #endregion
 
@@ -507,9 +509,10 @@ namespace KeyValueCollection
             {
                 _buckets = new int[capacity];
                 Entry[] entries = _entries = new Entry[capacity];
-#if TARGET_64BIT
-                _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)capacity);
-#endif
+                if (IntPtr.Size == 8)
+                {
+                    _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)capacity);   
+                }
 
                 var array = (Grouping<TKey, TElement>[])_siInfo.GetValue(ElementsName, typeof(Grouping<TKey, TElement>[]))!;
                 foreach (Grouping<TKey, TElement> grouping in array)
@@ -1234,15 +1237,17 @@ namespace KeyValueCollection
         }
 
         /// <summary>Gets a reference to the specified hashcode's bucket, containing an index into <see cref="_entries"/>.</summary>
+        [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private ref int GetBucketRef(int hashCode)
         {
             int[] buckets = _buckets!;
-#if TARGET_64BIT
-            return ref buckets[HashHelpers.FastMod((uint)hashCode, (uint)buckets.Length, _fastModMultiplier)];
-#else
+            if (IntPtr.Size == 8)
+            {
+                return ref buckets[HashHelpers.FastMod((uint)hashCode, (uint)buckets.Length, _fastModMultiplier)];   
+            }
+
             return ref buckets[(uint)hashCode % (uint)buckets.Length];
-#endif
         }
         
         /// <summary>
@@ -1259,9 +1264,11 @@ namespace KeyValueCollection
             _freeList = -1;
             _buckets = buckets;
             _entries = entries;
-#if TARGET_64BIT
-            _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)size);
-#endif
+
+            if (IntPtr.Size == 8)
+            {
+                _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)size);
+            }
             
             _keys = new KeyCollection(this);
             _values = new ValueCollection(this);
@@ -1290,9 +1297,11 @@ namespace KeyValueCollection
                 _freeList = source._freeList;
                 _freeCount = source._freeCount;
                 _count = source._count;
-#if TARGET_64BIT
-                _fastModMultiplier = source._fastModMultiplier;
-#endif
+                
+                if (IntPtr.Size == 8)
+                {
+                    _fastModMultiplier = source._fastModMultiplier;
+                }
             }
             else
             {
@@ -1319,7 +1328,7 @@ namespace KeyValueCollection
         /// <param name="location">The index into <see cref="_entries"/> of the element.</param>
         /// <returns>true if the element is added to the <see cref="KeyValueCollection.GroupingSet{TKey,TElement}"/> object; false if the element is already present.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool CreateIfNotPresent(in TKey key, out int location)
+        private unsafe bool CreateIfNotPresent(in TKey key, out int location)
         {
             if (_buckets == null)
             {
@@ -1330,15 +1339,14 @@ namespace KeyValueCollection
             Entry[]? entries = _entries;
             Debug.Assert(entries != null, "expected entries to be non-null");
 
-            int hashCode;
-            
             IEqualityComparer<TKey>? comparer = _comparer;
+            int hashCode;
 
             uint collisionCount = 0;
-#if NET5_0
-            ref int bucket = ref Unsafe.NullRef<int>();
- #else
-            int __bucket = -1;
+#if NET5_0 || NETCOREAPP3_1_OR_GREATER
+            ref int bucket = ref Unsafe.AsRef<int>(null);
+#else
+            int __bucket = -1; // dummy element
             ref int bucket = ref __bucket;
 #endif
             if (comparer == null)
@@ -1540,10 +1548,12 @@ namespace KeyValueCollection
 
             // Assign member variables after both arrays allocated to guard against corruption from OOM if second fails
             _buckets = new int[newSize];
-#if TARGET_64BIT
-            _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)newSize);
-#endif
-            
+
+            if (IntPtr.Size == 8)
+            {
+                _fastModMultiplier = HashHelpers.GetFastModMultiplier((uint)newSize);
+            }
+
             for (int i = 0; i < count; i++)
             {
                 ref Entry entry = ref entries[i];
@@ -1605,6 +1615,8 @@ namespace KeyValueCollection
                 ThrowHelper.ThrowInvalidOperationException_ConcurrentOperationsNotSupported();
         }
 
+        [Pure]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool GroupingContainsElements(TKey key, in IEnumerable<TElement> elements)
         {
             if (FindItemIndex(key, out int location) >= 0)
